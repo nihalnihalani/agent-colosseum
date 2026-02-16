@@ -1,0 +1,177 @@
+# === PYTHON ===
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Allow frontend lib directory
+!frontend/lib/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# === NODE.JS ===
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Runtime
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Cache
+.eslintcache
+.npm
+
+# === NEXT.JS & BUILD ===
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Production builds
+/build
+/dist
+/.next
+/out
+
+# === ENVIRONMENT & SECRETS ===
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+!.env.example
+*.pem
+*.key
+
+# Local overrides
+frontend/.env.local
+backend/.env
+
+# === SYSTEM FILES ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.fuse_hidden*
+
+# === IDE FILES ===
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+*.swp
+*.swo
+
+# Sublime
+*.sublime-project
+*.sublime-workspace
+
+# === LOGS & TEMP ===
+logs/
+*.log
+*.tmp
+*.temp
+.temp/
+.tmp/
+
+# === DATABASE ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === MISC ===
+# Backups
+*.bak
+*.backup
+*.old
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# === DEPLOYMENT ===
+.vercel
+.netlify
+
+# === PROJECT SPECIFIC ===
+# Status and temp docs
+RUNNING_STATUS.md
+TODO.md
+NOTES.md

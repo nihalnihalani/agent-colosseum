@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "backend/app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
+    }
+  ],
+  "env": {
+    "NVIDIA_API_KEY": "@nvidia_api_key",
+    "NEO4J_URI": "@neo4j_uri",
+    "NEO4J_USER": "@neo4j_user",
+    "NEO4J_PASSWORD": "@neo4j_password"
+  }
+}

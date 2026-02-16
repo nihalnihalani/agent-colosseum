@@ -1,0 +1,49 @@
+{
+  "id": 17344793,
+  "name": "[Morph] Socratic Questioning Verification - Low Pass Rate",
+  "type": "llm-observability alert",
+  "query": "formula(\"query8 / query9\").last(\"5m\") < 0.7",
+  "message": "ALERT: Morph AI Tutor - Socratic Questioning Verification Quality Degraded\n\nStatus: \n{{#is_alert}}\n@case-morph\n@kavishwer2301@gmail.com\nCRITICAL - Pass rate below 70%\n{{/is_alert}}\n\n{{#is_warning}}\n@case-morph\n@kavishwer2301@gmail.com\nWARNING - Pass rate below 80%\n{{/is_warning}}\n\nAlert Threshold: < 0.7 (70%)\nWarning Threshold: < 0.8 (80%)\n\nImpact:\n- AI tutor defaulting to direct instruction instead of Socratic questioning\n- Students receiving answers rather than guided discovery through targeted questions\n- Critical thinking and problem-solving skills not being developed\n- Core pedagogical principle of the application compromised\n\nEvaluation Details:\nThis monitor tracks the Socratic_Questioning evaluation which ensures the tutor uses leading questions and gentle nudges to guide student understanding rather than providing direct answers.\n\nInvestigation Steps:\n1. Review recent traces where Socratic_Questioning failed\n2. Identify patterns: Are direct answers given for specific question types?\n3. Check if contract terms balance between \"pure Socratic dialogue\" and \"direct instruction\" needs refinement\n4. Analyze if advanced/technical questions are triggering appropriate bypass of Socratic method\n5. Evaluate question quality: Are they truly guiding or just rhetorical?\n\nRunbook: https://github.com/kavishsathia/usemorph/wiki/Socratic-Questioning-Evaluation-Runbook\n\nRelated Resources:\n- LLM Observability Dashboard: https://us5.datadoghq.com/llm\n\n{{#is_recovery}}\n@case-morph\n@kavishwer2301@gmail.com\nRESOLVED: Socratic Questioning Verification pass rate has recovered.\n{{/is_recovery}}",
+  "tags": ["application:morph", "monitor-type:evaluation"],
+  "options": {
+    "thresholds": {
+      "critical": 0.7,
+      "warning": 0.8
+    },
+    "enable_logs_sample": false,
+    "notify_audit": false,
+    "on_missing_data": "default",
+    "include_tags": false,
+    "variables": [
+      {
+        "data_source": "llm_observability",
+        "name": "query8",
+        "indexes": ["*"],
+        "compute": {
+          "aggregation": "count"
+        },
+        "group_by": [],
+        "search": {
+          "query": "@event_type:span @ml_app:acf @evaluations.custom.Socratic_Questioning:pass"
+        },
+        "storage": "hot"
+      },
+      {
+        "data_source": "llm_observability",
+        "name": "query9",
+        "indexes": ["*"],
+        "compute": {
+          "aggregation": "count"
+        },
+        "group_by": [],
+        "search": {
+          "query": "@event_type:span @ml_app:acf @parent_id:undefined"
+        }
+      }
+    ],
+    "new_host_delay": 300,
+    "groupby_simple_monitor": false
+  },
+  "priority": 2,
+  "draft_status": "published"
+}
