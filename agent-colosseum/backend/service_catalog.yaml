@@ -1,0 +1,172 @@
+---
+# Datadog Service Catalog definitions for Agent Colosseum
+# Import via Datadog API (POST /api/v2/services/definitions) or UI
+schema-version: v2.1
+
+dd-service: agent-red
+team: agent-colosseum
+description: Red-side AI agent running opponent prediction via Amazon Bedrock
+lifecycle: production
+tier: tier1
+contacts:
+  - name: Agent Colosseum Team
+    type: email
+    contact: team-colosseum@example.com
+application: agent-colosseum
+languages:
+  - python
+type: service
+ci-pipeline-fingerprints:
+  - agent-colosseum-ci
+tags:
+  - agent:red
+  - component:predictor
+integrations:
+  opsgenie:
+    service-url: https://app.opsgenie.com/service/agent-colosseum
+links:
+  - name: Source Code
+    type: repo
+    url: https://github.com/org/agent-colosseum
+  - name: Runbook
+    type: runbook
+    url: https://wiki.example.com/agent-colosseum/runbook
+slos:
+  - name: Red Agent Prediction Completion
+    description: Percentage of prediction requests that complete without error
+    target: 99.5
+    type: availability
+  - name: Red Agent Round Latency
+    description: P95 round latency under 3 seconds
+    target: 97.0
+    type: latency
+monitors:
+  - name: Red Agent Error Rate
+  - name: Red Agent Latency P95
+dependencies:
+  - agent-blue
+  - match-server
+  - judge
+
+---
+dd-service: agent-blue
+team: agent-colosseum
+description: Blue-side AI agent running opponent prediction via Amazon Bedrock
+lifecycle: production
+tier: tier1
+contacts:
+  - name: Agent Colosseum Team
+    type: email
+    contact: team-colosseum@example.com
+application: agent-colosseum
+languages:
+  - python
+type: service
+tags:
+  - agent:blue
+  - component:predictor
+integrations:
+  opsgenie:
+    service-url: https://app.opsgenie.com/service/agent-colosseum
+links:
+  - name: Source Code
+    type: repo
+    url: https://github.com/org/agent-colosseum
+  - name: Runbook
+    type: runbook
+    url: https://wiki.example.com/agent-colosseum/runbook
+slos:
+  - name: Blue Agent Prediction Completion
+    description: Percentage of prediction requests that complete without error
+    target: 99.5
+    type: availability
+  - name: Blue Agent Round Latency
+    description: P95 round latency under 3 seconds
+    target: 97.0
+    type: latency
+monitors:
+  - name: Blue Agent Error Rate
+  - name: Blue Agent Latency P95
+dependencies:
+  - agent-red
+  - match-server
+  - judge
+
+---
+dd-service: match-server
+team: agent-colosseum
+description: WebSocket match orchestrator — manages rounds, scoring, and game state
+lifecycle: production
+tier: tier1
+contacts:
+  - name: Agent Colosseum Team
+    type: email
+    contact: team-colosseum@example.com
+application: agent-colosseum
+languages:
+  - python
+type: service
+tags:
+  - component:orchestrator
+integrations:
+  opsgenie:
+    service-url: https://app.opsgenie.com/service/agent-colosseum
+links:
+  - name: Source Code
+    type: repo
+    url: https://github.com/org/agent-colosseum
+  - name: Runbook
+    type: runbook
+    url: https://wiki.example.com/agent-colosseum/runbook
+slos:
+  - name: Match Completion Rate
+    description: Percentage of matches that run to completion
+    target: 99.0
+    type: availability
+  - name: WebSocket Uptime
+    description: WebSocket connection availability
+    target: 99.9
+    type: availability
+monitors:
+  - name: Match Server Error Rate
+  - name: WebSocket Connection Health
+dependencies:
+  - agent-red
+  - agent-blue
+  - judge
+
+---
+dd-service: judge
+team: agent-colosseum
+description: Scoring engine — resolves moves, applies rules, and determines round outcomes
+lifecycle: production
+tier: tier2
+contacts:
+  - name: Agent Colosseum Team
+    type: email
+    contact: team-colosseum@example.com
+application: agent-colosseum
+languages:
+  - python
+type: service
+tags:
+  - component:judge
+integrations:
+  opsgenie:
+    service-url: https://app.opsgenie.com/service/agent-colosseum
+links:
+  - name: Source Code
+    type: repo
+    url: https://github.com/org/agent-colosseum
+  - name: Runbook
+    type: runbook
+    url: https://wiki.example.com/agent-colosseum/runbook
+slos:
+  - name: Judge Scoring Accuracy
+    description: Scoring computations return correct results
+    target: 99.99
+    type: correctness
+monitors:
+  - name: Judge Error Rate
+dependencies:
+  - match-server

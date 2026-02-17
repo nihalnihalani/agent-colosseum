@@ -1,0 +1,73 @@
+{
+  "slos": [
+    {
+      "name": "Match Completion Rate",
+      "description": "Percentage of started matches that complete all rounds without error",
+      "type": "metric",
+      "query": {
+        "numerator": "sum:arena.matches.completed{*}.as_count()",
+        "denominator": "sum:arena.matches.completed{*}.as_count() + sum:arena.matches.failed{*}.as_count()"
+      },
+      "thresholds": [
+        {
+          "timeframe": "7d",
+          "target": 99.0,
+          "warning": 99.5
+        },
+        {
+          "timeframe": "30d",
+          "target": 99.0,
+          "warning": 99.5
+        }
+      ],
+      "tags": ["service:agent-colosseum", "component:match-server"],
+      "monitor_ids": []
+    },
+    {
+      "name": "Round Prediction Time",
+      "description": "P95 of prediction round-trip time stays under 3 seconds",
+      "type": "metric",
+      "query": {
+        "numerator": "sum:arena.round.latency.count{arena.round.latency:<3000}",
+        "denominator": "sum:arena.round.latency.count{*}"
+      },
+      "thresholds": [
+        {
+          "timeframe": "7d",
+          "target": 97.0,
+          "warning": 98.0
+        },
+        {
+          "timeframe": "30d",
+          "target": 97.0,
+          "warning": 98.0
+        }
+      ],
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "monitor_ids": []
+    },
+    {
+      "name": "Prediction Accuracy",
+      "description": "Overall prediction accuracy across all agents stays above 35%",
+      "type": "metric",
+      "query": {
+        "numerator": "sum:arena.predictions.correct{*}.as_count()",
+        "denominator": "sum:arena.predictions.total{*}.as_count()"
+      },
+      "thresholds": [
+        {
+          "timeframe": "7d",
+          "target": 35.0,
+          "warning": 40.0
+        },
+        {
+          "timeframe": "30d",
+          "target": 35.0,
+          "warning": 40.0
+        }
+      ],
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "monitor_ids": []
+    }
+  ]
+}

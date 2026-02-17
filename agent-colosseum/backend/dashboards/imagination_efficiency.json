@@ -1,0 +1,198 @@
+{
+  "title": "Agent Colosseum — Imagination Efficiency & LLM Cost",
+  "description": "LLM token usage, cost analysis, and prediction efficiency metrics",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "Total Tokens Consumed",
+        "type": "query_value",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.tokens.total{*}.as_count()",
+                "aggregator": "sum"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "scalar"
+          }
+        ],
+        "autoscale": true,
+        "precision": 0
+      }
+    },
+    {
+      "definition": {
+        "title": "Tokens Per Prediction",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "avg:arena.tokens.per_prediction{*} by {agent}"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "tokens", "min": "0" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Input vs Output Tokens",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "input_tok",
+                "query": "avg:arena.tokens.input{*} by {agent}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "output_tok",
+                "query": "avg:arena.tokens.output{*} by {agent}"
+              }
+            ],
+            "formulas": [
+              { "formula": "input_tok", "alias": "Input Tokens" },
+              { "formula": "output_tok", "alias": "Output Tokens" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Confidence Calibration Error",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "avg:arena.confidence.calibration{*} by {agent}"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "abs error", "min": "0", "max": "1" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Predicted Confidence vs Actual Accuracy",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "predicted",
+                "query": "avg:arena.confidence.predicted{*} by {agent}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "actual",
+                "query": "avg:arena.confidence.actual{*} by {agent}"
+              }
+            ],
+            "formulas": [
+              { "formula": "predicted", "alias": "Predicted Confidence" },
+              { "formula": "actual", "alias": "Actual Accuracy" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "min": "0", "max": "1" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Imagination Branches vs Accuracy",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "branches",
+                "query": "avg:arena.imagination.branches{*} by {agent}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "correct",
+                "query": "sum:arena.predictions.correct{*} by {agent}.as_count()"
+              },
+              {
+                "data_source": "metrics",
+                "name": "total",
+                "query": "sum:arena.predictions.total{*} by {agent}.as_count()"
+              }
+            ],
+            "formulas": [
+              { "formula": "branches", "alias": "Branches" },
+              { "formula": "(correct / total) * 100", "alias": "Accuracy %" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Cost Efficiency — Tokens per Correct Prediction",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "tokens",
+                "query": "sum:arena.tokens.total{*} by {agent}.as_count()"
+              },
+              {
+                "data_source": "metrics",
+                "name": "correct",
+                "query": "sum:arena.predictions.correct{*} by {agent}.as_count()"
+              }
+            ],
+            "formulas": [
+              { "formula": "tokens / correct", "alias": "Tokens / Correct Prediction" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "tokens", "min": "0" }
+      }
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "fixed",
+  "template_variables": [
+    {
+      "name": "agent",
+      "prefix": "agent",
+      "default": "*"
+    }
+  ]
+}

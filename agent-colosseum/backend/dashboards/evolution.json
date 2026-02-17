@@ -1,0 +1,215 @@
+{
+  "title": "Agent Colosseum — Evolution & Cross-Match Analytics",
+  "description": "Long-term strategy evolution, personality matchup analysis, and game-type trends",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "Strategy Distribution Over Time",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.strategy.distribution{*} by {agent,strategy}.as_count()"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Personality Win Rates",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "wins",
+                "query": "sum:arena.agent.personality_win_rate.wins{*} by {personality}.as_count()"
+              },
+              {
+                "data_source": "metrics",
+                "name": "total",
+                "query": "sum:arena.agent.personality_win_rate.total{*} by {personality}.as_count()"
+              }
+            ],
+            "formulas": [
+              { "formula": "(wins / total) * 100", "alias": "Win Rate %" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ],
+        "yaxis": { "label": "%", "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Game Type Popularity",
+        "type": "toplist",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.game.type{*} by {game_type}.as_count()"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Strategy Shifts Heat Map",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.strategy.shifts{*} by {from,to}.as_count()"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Match Duration Trends",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "p50",
+                "query": "p50:arena.match.duration_ms{*}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "p95",
+                "query": "p95:arena.match.duration_ms{*}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "p99",
+                "query": "p99:arena.match.duration_ms{*}"
+              }
+            ],
+            "formulas": [
+              { "formula": "p50", "alias": "P50" },
+              { "formula": "p95", "alias": "P95" },
+              { "formula": "p99", "alias": "P99" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "ms", "min": "0" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Personality Matchup Matrix — Win % (Heatmap)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "wins",
+                "query": "sum:arena.agent.personality_win_rate.wins{*} by {personality,opponent_personality}.as_count()"
+              },
+              {
+                "data_source": "metrics",
+                "name": "total",
+                "query": "sum:arena.agent.personality_win_rate.total{*} by {personality,opponent_personality}.as_count()"
+              }
+            ],
+            "formulas": [
+              { "formula": "(wins / total) * 100", "alias": "Win %" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ],
+        "yaxis": { "label": "%", "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Prediction Accuracy Evolution",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "correct",
+                "query": "sum:arena.predictions.correct{*} by {agent}.as_count().rollup(sum, 3600)"
+              },
+              {
+                "data_source": "metrics",
+                "name": "total",
+                "query": "sum:arena.predictions.total{*} by {agent}.as_count().rollup(sum, 3600)"
+              }
+            ],
+            "formulas": [
+              { "formula": "(correct / total) * 100", "alias": "Hourly Accuracy %" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "%", "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Rounds per Match",
+        "type": "distribution",
+        "requests": [
+          {
+            "query": "avg:arena.match.rounds{*}"
+          }
+        ]
+      }
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "fixed",
+  "template_variables": [
+    {
+      "name": "agent",
+      "prefix": "agent",
+      "default": "*"
+    },
+    {
+      "name": "game_type",
+      "prefix": "game_type",
+      "default": "*"
+    },
+    {
+      "name": "personality",
+      "prefix": "personality",
+      "default": "*"
+    }
+  ]
+}
