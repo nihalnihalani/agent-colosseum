@@ -287,6 +287,15 @@ class Neo4jClient:
                         blueMove.price = $blue_price,
                         blueMove.terms = $blue_terms
                     MERGE (r)-[:BLUE_MOVED]->(blueMove)
+
+                    WITH r
+                    UNWIND $predictions AS pred
+                    MERGE (p:Prediction {id: pred.id})
+                    SET p.opponent_move = pred.opponentMove,
+                        p.confidence = pred.confidence,
+                        p.was_correct = pred.wasCorrect,
+                        p.agent = pred.agent
+                    MERGE (p)-[:FOR_ROUND]->(r)
                     """,
                     match_id=match_id,
                     round=round_data["round"],
@@ -300,6 +309,13 @@ class Neo4jClient:
                     blue_type=round_data["blue_move"]["type"],
                     blue_price=round_data["blue_move"].get("price", 0),
                     blue_terms=round_data["blue_move"].get("terms", ""),
+                    predictions=[
+                        {**p, "agent": "red", "id": f"{match_id}_round_{round_data['round']}_red_pred_{i}"}
+                        for i, p in enumerate(round_data.get("red_predictions", []))
+                    ] + [
+                        {**p, "agent": "blue", "id": f"{match_id}_round_{round_data['round']}_blue_pred_{i}"}
+                        for i, p in enumerate(round_data.get("blue_predictions", []))
+                    ],
                 )
         except Exception as e:
             logger.warning("Failed to store negotiation round in Neo4j: %s", e)
@@ -353,6 +369,15 @@ class Neo4jClient:
                     SET blueBid.type = $blue_type,
                         blueBid.amount = $blue_amount
                     MERGE (r)-[:BLUE_MOVED]->(blueBid)
+
+                    WITH r
+                    UNWIND $predictions AS pred
+                    MERGE (p:Prediction {id: pred.id})
+                    SET p.opponent_move = pred.opponentMove,
+                        p.confidence = pred.confidence,
+                        p.was_correct = pred.wasCorrect,
+                        p.agent = pred.agent
+                    MERGE (p)-[:FOR_ROUND]->(r)
                     """,
                     match_id=match_id,
                     round=round_data["round"],
@@ -364,6 +389,13 @@ class Neo4jClient:
                     red_amount=round_data["red_move"].get("amount", 0),
                     blue_type=round_data["blue_move"]["type"],
                     blue_amount=round_data["blue_move"].get("amount", 0),
+                    predictions=[
+                        {**p, "agent": "red", "id": f"{match_id}_round_{round_data['round']}_red_pred_{i}"}
+                        for i, p in enumerate(round_data.get("red_predictions", []))
+                    ] + [
+                        {**p, "agent": "blue", "id": f"{match_id}_round_{round_data['round']}_blue_pred_{i}"}
+                        for i, p in enumerate(round_data.get("blue_predictions", []))
+                    ],
                 )
         except Exception as e:
             logger.warning("Failed to store auction round in Neo4j: %s", e)
