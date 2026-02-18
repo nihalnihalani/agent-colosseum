@@ -8,7 +8,7 @@ import logging
 import os
 import random
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -791,20 +791,63 @@ class AgentPredictor:
 
         with _llmobs_prediction_span(self.agent_name, self.personality, game_state.to_dict()):
             try:
-                response = await asyncio.to_thread(
-                    client.invoke_model,
-                    modelId=model_id,
-                    contentType="application/json",
-                    body=json.dumps({
-                        "anthropic_version": "bedrock-2023-05-31",
-                        "max_tokens": 1024,
-                        "temperature": config["temperature"],
-                        "messages": [{"role": "user", "content": prompt}],
-                    }),
+                # --- LLM span: wraps the actual Bedrock invocation ---
+                llm_ctx = (
+                    _LLMObs.llm(
+                        model_name=model_id,
+                        model_provider="bedrock",
+                        name="bedrock_prediction",
+                    )
+                    if _llmobs_enabled
+                    else nullcontext()
                 )
 
-                body = json.loads(response["body"].read())
-                content = body.get("content", [{}])[0].get("text", "{}")
+                with llm_ctx:
+                    if _llmobs_enabled:
+                        try:
+                            _LLMObs.annotate(
+                                input_data=[{"role": "user", "content": prompt}],
+                            )
+                        except Exception:
+                            pass
+
+                    response = await asyncio.to_thread(
+                        client.invoke_model,
+                        modelId=model_id,
+                        contentType="application/json",
+                        body=json.dumps({
+                            "anthropic_version": "bedrock-2023-05-31",
+                            "max_tokens": 1024,
+                            "temperature": config["temperature"],
+                            "messages": [{"role": "user", "content": prompt}],
+                        }),
+                    )
+
+                    body = json.loads(response["body"].read())
+                    content = body.get("content", [{}])[0].get("text", "{}")
+
+                    # Extract token usage from Bedrock response
+                    usage = body.get("usage", {})
+                    input_tokens = usage.get("input_tokens", 0)
+                    output_tokens = usage.get("output_tokens", 0)
+
+                    if _llmobs_enabled:
+                        try:
+                            _LLMObs.annotate(
+                                output_data=[{"role": "assistant", "content": content}],
+                                metrics={"input_tokens": input_tokens, "output_tokens": output_tokens},
+                            )
+                        except Exception:
+                            pass
+
+                # Log token usage to DogStatsD
+                try:
+                    from backend.datadog_metrics import arena_metrics
+                    arena_metrics.log_token_usage(
+                        self.agent_name, input_tokens, output_tokens
+                    )
+                except Exception:
+                    pass
 
                 # Parse JSON from response (handle markdown code blocks)
                 if "```json" in content:
