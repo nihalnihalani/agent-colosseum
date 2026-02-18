@@ -929,10 +929,13 @@ class AgentPredictor:
                         delta = chunk.get("delta", {}).get("text", "")
                         full_text += delta
                         yield {"type": "stream_chunk", "text": delta}
-                    # Final chunk contains token usage
+                    # message_start carries input token count
+                    if chunk.get("type") == "message_start":
+                        usage = chunk.get("message", {}).get("usage", {})
+                        input_tokens = usage.get("input_tokens", 0)
+                    # message_delta carries output token count
                     if chunk.get("type") == "message_delta":
                         usage = chunk.get("usage", {})
-                        input_tokens = usage.get("input_tokens", 0)
                         output_tokens = usage.get("output_tokens", 0)
 
                 # Parse final result
