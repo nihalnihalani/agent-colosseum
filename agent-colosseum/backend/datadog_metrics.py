@@ -172,14 +172,18 @@ def setup_llmobs() -> None:
         logger.warning("DD_API_KEY not set — LLM Observability disabled")
         return
 
+    site = os.getenv("DD_SITE", "datadoghq.com")
+
     try:
         from ddtrace.llmobs import LLMObs
 
         LLMObs.enable(
             ml_app="agent-colosseum",
+            api_key=api_key,
+            site=site,
             integrations_enabled=True,
             agentless_enabled=True,
         )
-        logger.info("Datadog LLM Observability enabled")
+        logger.info("Datadog LLM Observability enabled (site=%s)", site)
     except Exception as e:
         logger.warning("Failed to enable LLM Observability: %s", e)
