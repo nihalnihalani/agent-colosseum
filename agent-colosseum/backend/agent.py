@@ -897,52 +897,88 @@ class AgentPredictor:
 
         prompt = self._build_prompt(game_state, my_history, opponent_history)
 
-        try:
-            response = await asyncio.to_thread(
-                client.invoke_model_with_response_stream,
-                modelId=model_id,
-                contentType="application/json",
-                body=json.dumps({
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 1024,
-                    "temperature": config["temperature"],
-                    "messages": [{"role": "user", "content": prompt}],
-                }),
-            )
+        # Open LLMObs workflow span for the streaming prediction
+        with _llmobs_prediction_span(self.agent_name, self.personality, game_state.to_dict()):
+            if _llmobs_enabled:
+                try:
+                    _LLMObs.annotate(
+                        input_data=[{"role": "user", "content": prompt}],
+                    )
+                except Exception:
+                    pass
 
-            full_text = ""
-            for event in response["body"]:
-                chunk = json.loads(event["chunk"]["bytes"])
-                if chunk.get("type") == "content_block_delta":
-                    delta = chunk.get("delta", {}).get("text", "")
-                    full_text += delta
-                    yield {"type": "stream_chunk", "text": delta}
+            try:
+                response = await asyncio.to_thread(
+                    client.invoke_model_with_response_stream,
+                    modelId=model_id,
+                    contentType="application/json",
+                    body=json.dumps({
+                        "anthropic_version": "bedrock-2023-05-31",
+                        "max_tokens": 1024,
+                        "temperature": config["temperature"],
+                        "messages": [{"role": "user", "content": prompt}],
+                    }),
+                )
 
-            # Parse final result
-            if "```json" in full_text:
-                full_text = full_text.split("```json")[1].split("```")[0]
-            elif "```" in full_text:
-                full_text = full_text.split("```")[1].split("```")[0]
+                full_text = ""
+                input_tokens = 0
+                output_tokens = 0
+                for event in response["body"]:
+                    chunk = json.loads(event["chunk"]["bytes"])
+                    if chunk.get("type") == "content_block_delta":
+                        delta = chunk.get("delta", {}).get("text", "")
+                        full_text += delta
+                        yield {"type": "stream_chunk", "text": delta}
+                    # Final chunk contains token usage
+                    if chunk.get("type") == "message_delta":
+                        usage = chunk.get("usage", {})
+                        input_tokens = usage.get("input_tokens", 0)
+                        output_tokens = usage.get("output_tokens", 0)
 
-            parsed = json.loads(full_text.strip())
-            chosen_move = self._parse_chosen_move(parsed)
+                # Parse final result
+                if "```json" in full_text:
+                    full_text = full_text.split("```json")[1].split("```")[0]
+                elif "```" in full_text:
+                    full_text = full_text.split("```")[1].split("```")[0]
 
-            result = PredictionResult(
-                predictions=parsed.get("predictions", []),
-                chosen_move=chosen_move,
-                reasoning=parsed.get("reasoning", ""),
-            )
+                parsed = json.loads(full_text.strip())
+                chosen_move = self._parse_chosen_move(parsed)
 
-            # Submit LLM Obs evaluations for streamed predictions
-            _llmobs_submit_evaluation(self.agent_name, result.predictions)
+                result = PredictionResult(
+                    predictions=parsed.get("predictions", []),
+                    chosen_move=chosen_move,
+                    reasoning=parsed.get("reasoning", ""),
+                )
 
-            for i, pred in enumerate(result.predictions):
-                yield {"type": "prediction_branch", "index": i, "prediction": pred}
-            yield {"type": "prediction_complete", "result": result}
+                # Annotate output + token counts on the workflow span
+                if _llmobs_enabled:
+                    try:
+                        _LLMObs.annotate(
+                            output_data=[{"role": "assistant", "content": full_text}],
+                            metrics={"input_tokens": input_tokens, "output_tokens": output_tokens},
+                        )
+                    except Exception:
+                        pass
 
-        except Exception as e:
-            logger.error("Bedrock streaming failed for %s: %s", self.agent_name, e)
-            result = self._fallback_mock(game_state, opponent_history, my_history)
-            for i, pred in enumerate(result.predictions):
-                yield {"type": "prediction_branch", "index": i, "prediction": pred}
-            yield {"type": "prediction_complete", "result": result}
+                # Log token usage to DogStatsD
+                try:
+                    from backend.datadog_metrics import arena_metrics
+                    arena_metrics.log_token_usage(
+                        self.agent_name, input_tokens, output_tokens
+                    )
+                except Exception:
+                    pass
+
+                # Submit LLM Obs evaluations for streamed predictions
+                _llmobs_submit_evaluation(self.agent_name, result.predictions)
+
+                for i, pred in enumerate(result.predictions):
+                    yield {"type": "prediction_branch", "index": i, "prediction": pred}
+                yield {"type": "prediction_complete", "result": result}
+
+            except Exception as e:
+                logger.error("Bedrock streaming failed for %s: %s", self.agent_name, e)
+                result = self._fallback_mock(game_state, opponent_history, my_history)
+                for i, pred in enumerate(result.predictions):
+                    yield {"type": "prediction_branch", "index": i, "prediction": pred}
+                yield {"type": "prediction_complete", "result": result}
