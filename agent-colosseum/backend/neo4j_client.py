@@ -41,49 +41,50 @@ class Neo4jClient:
                 await session.run(
                     """
                     MERGE (m:Match {id: $match_id})
-                    CREATE (r:Round {
-                        number: $round,
-                        game_state_hash: $state_hash
-                    })
-                    CREATE (m)-[:HAS_ROUND]->(r)
+                    MERGE (r:Round {id: $round_id})
+                    SET r.number = $round, r.game_state_hash = $state_hash
+                    MERGE (m)-[:HAS_ROUND]->(r)
 
-                    CREATE (redMove:Move {
-                        type: $red_move_type,
-                        target: $red_target,
-                        amount: $red_amount
-                    })
-                    CREATE (blueMove:Move {
-                        type: $blue_move_type,
-                        target: $blue_target,
-                        amount: $blue_amount
-                    })
-                    CREATE (r)-[:RED_MOVED]->(redMove)
-                    CREATE (r)-[:BLUE_MOVED]->(blueMove)
+                    MERGE (redMove:Move {id: $red_move_id})
+                    SET redMove.type = $red_move_type,
+                        redMove.target = $red_target,
+                        redMove.amount = $red_amount
+                    MERGE (r)-[:RED_MOVED]->(redMove)
+
+                    MERGE (blueMove:Move {id: $blue_move_id})
+                    SET blueMove.type = $blue_move_type,
+                        blueMove.target = $blue_target,
+                        blueMove.amount = $blue_amount
+                    MERGE (r)-[:BLUE_MOVED]->(blueMove)
 
                     WITH r
                     UNWIND $predictions AS pred
-                    CREATE (p:Prediction {
-                        opponent_move: pred.opponentMove,
-                        confidence: pred.confidence,
-                        was_correct: pred.wasCorrect,
-                        agent: pred.agent
-                    })
-                    CREATE (p)-[:FOR_ROUND]->(r)
+                    MERGE (p:Prediction {id: pred.id})
+                    SET p.opponent_move = pred.opponentMove,
+                        p.confidence = pred.confidence,
+                        p.was_correct = pred.wasCorrect,
+                        p.agent = pred.agent
+                    MERGE (p)-[:FOR_ROUND]->(r)
                     """,
                     match_id=match_id,
                     round=round_data["round"],
+                    round_id=f"{match_id}_round_{round_data['round']}",
+                    red_move_id=f"{match_id}_round_{round_data['round']}_red",
+                    blue_move_id=f"{match_id}_round_{round_data['round']}_blue",
                     state_hash=round_data.get("state_hash", ""),
                     red_move_type=round_data["red_move"]["type"],
-                    red_target=round_data["red_move"]["target"],
-                    red_amount=round_data["red_move"]["amount"],
+                    red_target=round_data["red_move"].get("target", ""),
+                    red_amount=round_data["red_move"].get("amount", 0),
                     blue_move_type=round_data["blue_move"]["type"],
-                    blue_target=round_data["blue_move"]["target"],
-                    blue_amount=round_data["blue_move"]["amount"],
+                    blue_target=round_data["blue_move"].get("target", ""),
+                    blue_amount=round_data["blue_move"].get("amount", 0),
                     predictions=[
-                        {**p, "agent": "red"} for p in round_data.get("red_predictions", [])
+                        {**p, "agent": "red", "id": f"{match_id}_r{round_data['round']}_red_pred_{i}"}
+                        for i, p in enumerate(round_data.get("red_predictions", []))
                     ]
                     + [
-                        {**p, "agent": "blue"} for p in round_data.get("blue_predictions", [])
+                        {**p, "agent": "blue", "id": f"{match_id}_r{round_data['round']}_blue_pred_{i}"}
+                        for i, p in enumerate(round_data.get("blue_predictions", []))
                     ],
                 )
         except Exception as e:
@@ -266,27 +267,27 @@ class Neo4jClient:
                     """
                     MERGE (m:Match {id: $match_id})
                     SET m.game_type = 'negotiation'
-                    CREATE (r:Round {
-                        number: $round,
-                        game_state_hash: $state_hash
-                    })
-                    CREATE (m)-[:HAS_ROUND]->(r)
+                    MERGE (r:Round {id: $round_id})
+                    SET r.number = $round, r.game_state_hash = $state_hash
+                    MERGE (m)-[:HAS_ROUND]->(r)
 
-                    CREATE (redMove:Move {
-                        type: $red_type,
-                        price: $red_price,
-                        terms: $red_terms
-                    })
-                    CREATE (blueMove:Move {
-                        type: $blue_type,
-                        price: $blue_price,
-                        terms: $blue_terms
-                    })
-                    CREATE (r)-[:RED_MOVED]->(redMove)
-                    CREATE (r)-[:BLUE_MOVED]->(blueMove)
+                    MERGE (redMove:Move {id: $red_move_id})
+                    SET redMove.type = $red_type,
+                        redMove.price = $red_price,
+                        redMove.terms = $red_terms
+                    MERGE (r)-[:RED_MOVED]->(redMove)
+
+                    MERGE (blueMove:Move {id: $blue_move_id})
+                    SET blueMove.type = $blue_type,
+                        blueMove.price = $blue_price,
+                        blueMove.terms = $blue_terms
+                    MERGE (r)-[:BLUE_MOVED]->(blueMove)
                     """,
                     match_id=match_id,
                     round=round_data["round"],
+                    round_id=f"{match_id}_round_{round_data['round']}",
+                    red_move_id=f"{match_id}_round_{round_data['round']}_red",
+                    blue_move_id=f"{match_id}_round_{round_data['round']}_blue",
                     state_hash=round_data.get("state_hash", ""),
                     red_type=round_data["red_move"]["type"],
                     red_price=round_data["red_move"].get("price", 0),
@@ -332,25 +333,25 @@ class Neo4jClient:
                     """
                     MERGE (m:Match {id: $match_id})
                     SET m.game_type = 'auction'
-                    CREATE (r:Round {
-                        number: $round,
-                        item_name: $item_name
-                    })
-                    CREATE (m)-[:HAS_ROUND]->(r)
+                    MERGE (r:Round {id: $round_id})
+                    SET r.number = $round, r.item_name = $item_name
+                    MERGE (m)-[:HAS_ROUND]->(r)
 
-                    CREATE (redBid:Move {
-                        type: $red_type,
-                        amount: $red_amount
-                    })
-                    CREATE (blueBid:Move {
-                        type: $blue_type,
-                        amount: $blue_amount
-                    })
-                    CREATE (r)-[:RED_MOVED]->(redBid)
-                    CREATE (r)-[:BLUE_MOVED]->(blueBid)
+                    MERGE (redBid:Move {id: $red_move_id})
+                    SET redBid.type = $red_type,
+                        redBid.amount = $red_amount
+                    MERGE (r)-[:RED_MOVED]->(redBid)
+
+                    MERGE (blueBid:Move {id: $blue_move_id})
+                    SET blueBid.type = $blue_type,
+                        blueBid.amount = $blue_amount
+                    MERGE (r)-[:BLUE_MOVED]->(blueBid)
                     """,
                     match_id=match_id,
                     round=round_data["round"],
+                    round_id=f"{match_id}_round_{round_data['round']}",
+                    red_move_id=f"{match_id}_round_{round_data['round']}_red",
+                    blue_move_id=f"{match_id}_round_{round_data['round']}_blue",
                     item_name=round_data.get("item_name", ""),
                     red_type=round_data["red_move"]["type"],
                     red_amount=round_data["red_move"].get("amount", 0),
@@ -420,6 +421,21 @@ class Neo4jClient:
                 await session.run(
                     "CREATE INDEX match_game_type IF NOT EXISTS "
                     "FOR (m:Match) ON (m.game_type)"
+                )
+                # Uniqueness constraint on Round.id
+                await session.run(
+                    "CREATE CONSTRAINT round_id IF NOT EXISTS "
+                    "FOR (r:Round) REQUIRE r.id IS UNIQUE"
+                )
+                # Uniqueness constraint on Move.id
+                await session.run(
+                    "CREATE CONSTRAINT move_id IF NOT EXISTS "
+                    "FOR (m:Move) REQUIRE m.id IS UNIQUE"
+                )
+                # Uniqueness constraint on Prediction.id
+                await session.run(
+                    "CREATE CONSTRAINT prediction_id IF NOT EXISTS "
+                    "FOR (p:Prediction) REQUIRE p.id IS UNIQUE"
                 )
 
             # Vector index — only create when NEO4J_VECTOR_DIMENSIONS is configured
