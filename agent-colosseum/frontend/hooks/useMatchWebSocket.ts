@@ -475,11 +475,15 @@ export function useMatchWebSocket(matchId: string | null) {
       reconnectAttempts.current = 0;
       // Drain any pending start_match that was queued before the connection opened
       if (pendingConfigRef.current) {
+        const cfg = pendingConfigRef.current;
+        pendingConfigRef.current = null;  // null BEFORE send to avoid double-send on throw
         ws.send(JSON.stringify({
           type: 'start_match',
-          ...pendingConfigRef.current,
+          gameType: cfg.gameType,
+          redPersonality: cfg.redPersonality,
+          bluePersonality: cfg.bluePersonality,
+          rounds: cfg.totalRounds,
         }));
-        pendingConfigRef.current = null;
       }
     };
 
@@ -534,9 +538,12 @@ export function useMatchWebSocket(matchId: string | null) {
             rounds: config.totalRounds,
           })
         );
-      } else {
-        // Queue the config to be sent as soon as the socket opens
+      } else if (wsRef.current !== null) {
+        // Socket is CONNECTING or CLOSING — queue to drain on open
+        // Only the most-recent config is kept; earlier calls while CONNECTING are superseded.
         pendingConfigRef.current = config;
+      } else {
+        console.warn('[useMatchWebSocket] startMatch called but no WebSocket exists yet');
       }
     },
     [isMock, runMockMatch]
