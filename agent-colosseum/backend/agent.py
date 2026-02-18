@@ -235,6 +235,7 @@ class PredictionResult:
     predictions: list[dict] = field(default_factory=list)
     chosen_move: Optional[Move] = None
     reasoning: str = ""
+    llmobs_span: Any = None  # exported span context for deferred evaluation submission
 
     def to_dict(self) -> dict:
         return {
@@ -864,10 +865,13 @@ class AgentPredictor:
                     reasoning=parsed.get("reasoning", ""),
                 )
 
-                # Submit evaluation for each prediction branch
-                _llmobs_submit_evaluation(
-                    self.agent_name, result.predictions
-                )
+                # Export the active span so match.py can submit evaluations
+                # after round resolution, when the actual opponent move is known.
+                if _llmobs_enabled:
+                    try:
+                        result.llmobs_span = _LLMObs.export_span()
+                    except Exception:
+                        pass
 
                 return result
 
@@ -971,9 +975,6 @@ class AgentPredictor:
                     )
                 except Exception:
                     pass
-
-                # Submit LLM Obs evaluations for streamed predictions
-                _llmobs_submit_evaluation(self.agent_name, result.predictions)
 
                 for i, pred in enumerate(result.predictions):
                     yield {"type": "prediction_branch", "index": i, "prediction": pred}
