@@ -336,18 +336,41 @@ class Match:
         # --- Neo4j storage ---
         if self._neo4j_client:
             try:
-                await self._neo4j_client.store_round(
-                    match_id=self.config.match_id,
-                    round_data={
-                        "round": round_num,
-                        "state_hash": state_before.state_hash(),
-                        "red_move": red_move.to_dict(),
-                        "blue_move": blue_move.to_dict(),
-                        "red_predictions": red_preds_annotated,
-                        "blue_predictions": blue_preds_annotated,
-                        "resolution": resolution.to_dict(),
-                    },
-                )
+                gt = self.config.game_type
+                if gt == "negotiation":
+                    await self._neo4j_client.store_negotiation_round(
+                        match_id=self.config.match_id,
+                        round_data={
+                            "round": round_num,
+                            "state_hash": state_before.state_hash(),
+                            "red_move": red_move.to_dict(),
+                            "blue_move": blue_move.to_dict(),
+                        },
+                    )
+                elif gt == "auction":
+                    current_item = state_before.current_item()
+                    await self._neo4j_client.store_auction_round(
+                        match_id=self.config.match_id,
+                        round_data={
+                            "round": round_num,
+                            "item_name": current_item.name if current_item else "",
+                            "red_move": red_move.to_dict(),
+                            "blue_move": blue_move.to_dict(),
+                        },
+                    )
+                else:
+                    await self._neo4j_client.store_round(
+                        match_id=self.config.match_id,
+                        round_data={
+                            "round": round_num,
+                            "state_hash": state_before.state_hash(),
+                            "red_move": red_move.to_dict(),
+                            "blue_move": blue_move.to_dict(),
+                            "red_predictions": red_preds_annotated,
+                            "blue_predictions": blue_preds_annotated,
+                            "resolution": resolution.to_dict(),
+                        },
+                    )
             except Exception as e:
                 logger.warning("Neo4j storage failed: %s", e)
 
