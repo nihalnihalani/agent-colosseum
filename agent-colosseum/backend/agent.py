@@ -71,19 +71,24 @@ def _llmobs_prediction_span(agent_name: str, personality: str, game_state_dict: 
 def _llmobs_submit_evaluation(
     agent_name: str,
     predictions: list[dict],
-    actual_move: str | None = None,
+    actual_move: str,
+    span_context: Any = None,
 ) -> None:
-    """Submit prediction accuracy evaluations to LLM Observability."""
-    if not _llmobs_enabled or actual_move is None:
+    """Submit prediction accuracy evaluations to LLM Observability.
+
+    Must be called after round resolution when actual_move is known.
+    span_context should be the LLMObs exported span from prediction time,
+    stored on PredictionResult.llmobs_span.
+    """
+    if not _llmobs_enabled or span_context is None:
         return
 
     try:
-        exported_span = _LLMObs.export_span()
         for i, pred in enumerate(predictions):
             predicted = pred.get("opponentMove", "")
             was_correct = predicted == actual_move
             _LLMObs.submit_evaluation(
-                span_context=exported_span,
+                span_context=span_context,
                 label=f"prediction_{i}_accuracy",
                 metric_type="score",
                 value=1.0 if was_correct else 0.0,
