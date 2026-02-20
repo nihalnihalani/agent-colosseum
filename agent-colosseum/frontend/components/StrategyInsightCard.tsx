@@ -66,7 +66,12 @@ function RiskMeter({ level, color }: { level: number; color: 'red' | 'blue' }) {
 }
 
 export function StrategyInsightCard({ state }: { state: CommentatorState }) {
-  const recentMoments = state.keyMoments.slice(-3);
+  const recentMoments = (state?.keyMoments ?? []).slice(-3);
+  const momentum = state?.momentum ?? { leader: '', confidence: 0, reason: '' };
+  const strategyAnalysis = state?.strategyAnalysis ?? {
+    red: { style: 'Analyzing...', currentTactic: '', riskLevel: 0.5 },
+    blue: { style: 'Analyzing...', currentTactic: '', riskLevel: 0.5 },
+  };
 
   return (
     <motion.div
@@ -76,9 +81,9 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
       transition={{ duration: 0.3 }}
     >
       {/* Momentum */}
-      <MomentumBar leader={state.momentum.leader} confidence={state.momentum.confidence} />
-      {state.momentum.reason && (
-        <p className="text-[9px] text-zinc-600 font-mono text-center truncate">{state.momentum.reason}</p>
+      <MomentumBar leader={momentum.leader} confidence={momentum.confidence} />
+      {momentum.reason && (
+        <p className="text-[9px] text-zinc-600 font-mono text-center truncate">{momentum.reason}</p>
       )}
 
       {/* Strategy badges */}
@@ -86,12 +91,12 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
         <div className="flex items-center gap-1.5">
           <Zap className="w-2.5 h-2.5 text-rose-400" />
           <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/10 truncate max-w-[100px]">
-            {state.strategyAnalysis.red.style}
+            {strategyAnalysis.red?.style ?? 'Analyzing...'}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/10 truncate max-w-[100px]">
-            {state.strategyAnalysis.blue.style}
+            {strategyAnalysis.blue?.style ?? 'Analyzing...'}
           </span>
           <Brain className="w-2.5 h-2.5 text-blue-400" />
         </div>
@@ -101,11 +106,11 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-0.5">
           <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Red Risk</span>
-          <RiskMeter level={state.strategyAnalysis.red.riskLevel} color="red" />
+          <RiskMeter level={strategyAnalysis.red?.riskLevel ?? 0.5} color="red" />
         </div>
         <div className="space-y-0.5">
           <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Blue Risk</span>
-          <RiskMeter level={state.strategyAnalysis.blue.riskLevel} color="blue" />
+          <RiskMeter level={strategyAnalysis.blue?.riskLevel ?? 0.5} color="blue" />
         </div>
       </div>
 
@@ -132,7 +137,7 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
       )}
 
       {/* Current insight */}
-      {state.currentInsight && (
+      {state?.currentInsight && (
         <div className="pt-1 border-t border-white/5">
           <p className="text-[11px] text-zinc-300 leading-relaxed">{state.currentInsight}</p>
         </div>
