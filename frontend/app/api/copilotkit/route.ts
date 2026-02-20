@@ -12,7 +12,7 @@ const backendUrl =
   "http://127.0.0.1:8000";
 
 const arenaCommentator = new HttpAgent({
-  url: `${backendUrl}/agent`,
+  url: `${backendUrl}/copilotkit`,
 });
 
 const runtime = new CopilotRuntime({
