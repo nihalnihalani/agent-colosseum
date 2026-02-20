@@ -397,6 +397,7 @@ class Match:
                         match_id=self.config.match_id,
                         round_data={
                             "round": round_num,
+                            "state_hash": state_before.state_hash(),
                             "item_name": current_item.name if current_item else "",
                             "red_move": red_move.to_dict(),
                             "blue_move": blue_move.to_dict(),

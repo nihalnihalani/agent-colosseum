@@ -357,7 +357,8 @@ class Neo4jClient:
                     MERGE (m:Match {id: $match_id})
                     SET m.game_type = 'auction'
                     MERGE (r:Round {id: $round_id})
-                    SET r.number = $round, r.item_name = $item_name
+                    SET r.number = $round, r.item_name = $item_name,
+                        r.game_state_hash = $state_hash
                     MERGE (m)-[:HAS_ROUND]->(r)
 
                     MERGE (redBid:Move {id: $red_move_id})
@@ -384,6 +385,7 @@ class Neo4jClient:
                     round_id=f"{match_id}_round_{round_data['round']}",
                     red_move_id=f"{match_id}_round_{round_data['round']}_red",
                     blue_move_id=f"{match_id}_round_{round_data['round']}_blue",
+                    state_hash=round_data.get("state_hash", ""),
                     item_name=round_data.get("item_name", ""),
                     red_type=round_data["red_move"]["type"],
                     red_amount=round_data["red_move"].get("amount", 0),
