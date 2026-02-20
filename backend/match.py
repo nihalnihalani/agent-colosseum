@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Optional
 
-from backend.agent import AgentPredictor, PredictionResult
+from backend.agent import AgentPredictor, PredictionResult, _llmobs_submit_evaluation
 from backend.game_engine import (
     GameState,
     Move,
@@ -286,6 +286,26 @@ class Match:
         )
         blue_preds_annotated = self._annotate_predictions(
             blue_result.predictions, red_move, "blue"
+        )
+
+        # --- LLMObs deferred evaluations: submit now that actual moves are known ---
+        # Red predicted blue's move; blue predicted red's move.
+        gt = self.config.game_type
+        if gt == "negotiation":
+            blue_actual_str = f"{blue_move.type.value}_{blue_move.price}"
+            red_actual_str = f"{red_move.type.value}_{red_move.price}"
+        elif gt == "auction":
+            blue_actual_str = f"{blue_move.type.value}_{blue_move.amount}"
+            red_actual_str = f"{red_move.type.value}_{red_move.amount}"
+        else:
+            blue_actual_str = f"{blue_move.type.value}_{blue_move.target.value}"
+            red_actual_str = f"{red_move.type.value}_{red_move.target.value}"
+
+        _llmobs_submit_evaluation(
+            "red", red_result.predictions, blue_actual_str, red_result.llmobs_span
+        )
+        _llmobs_submit_evaluation(
+            "blue", blue_result.predictions, red_actual_str, blue_result.llmobs_span
         )
 
         # --- collapse event ---
