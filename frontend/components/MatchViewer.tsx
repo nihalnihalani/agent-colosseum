@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useCoAgent } from '@copilotkit/react-core';
 import { AgentPanel } from './AgentPanel';
 import { ScoreDisplay } from './ScoreDisplay';
 import { AICommentator } from './AICommentator';
@@ -9,6 +10,7 @@ import { NegotiationView } from './NegotiationView';
 import { AuctionView } from './AuctionView';
 import { AudiencePoll } from './AudiencePoll';
 import type { MatchState } from '@/lib/types';
+import type { CommentatorState } from './StrategyInsightCard';
 import { Trophy, ArrowLeft, Activity, Radio, Cpu, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -260,6 +262,37 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
   const isMatchEnd = matchState.phase === 'match_end';
   const showFlash = matchState.phase === 'revealed';
 
+  // CopilotKit: bidirectional state sync with arena-commentator agent
+  const { state: commentatorState, setState: setCommentatorState } = useCoAgent<CommentatorState>({
+    name: "arena-commentator",
+    initialState: {
+      strategyAnalysis: {
+        red: { style: "unknown", currentTactic: "analyzing...", riskLevel: 0 },
+        blue: { style: "unknown", currentTactic: "analyzing...", riskLevel: 0 },
+      },
+      momentum: { leader: "none", confidence: 0, reason: "Match starting..." },
+      predictionTrends: { red: [], blue: [] },
+      keyMoments: [],
+      currentInsight: "Initializing...",
+      matchProgress: { round: 0, totalRounds: 10, phase: "lobby" },
+    },
+  });
+
+  // Push audience votes into the agent's state when the user votes
+  const handleAudienceVote = (team: "red" | "blue") => {
+    setCommentatorState((prev: CommentatorState | undefined) => {
+      const base = prev ?? commentatorState;
+      const prevVotes = (base as any).audience_votes ?? { red: 0, blue: 0 };
+      return {
+        ...base,
+        audience_votes: {
+          ...prevVotes,
+          [team]: (prevVotes[team] ?? 0) + 1,
+        },
+      } as CommentatorState;
+    });
+  };
+
   // Track round winner for audience poll
   const [lastRoundWinner, setLastRoundWinner] = useState<string | undefined>();
 
@@ -374,11 +407,12 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <AICommentator matchState={matchState} />
+             <AICommentator matchState={matchState} commentatorState={commentatorState} />
              <AudiencePoll
                currentRound={matchState.currentRound}
                phase={matchState.phase}
                roundWinner={lastRoundWinner}
+               onVote={handleAudienceVote}
              />
           </div>
         </div>

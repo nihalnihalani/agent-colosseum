@@ -10,6 +10,7 @@ interface AudiencePollProps {
   currentRound: number;
   phase: MatchPhase;
   roundWinner?: string;
+  onVote?: (team: "red" | "blue") => void;
 }
 
 interface Vote {
@@ -18,7 +19,7 @@ interface Vote {
   wasCorrect?: boolean;
 }
 
-export function AudiencePoll({ currentRound, phase, roundWinner }: AudiencePollProps) {
+export function AudiencePoll({ currentRound, phase, roundWinner, onVote }: AudiencePollProps) {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [currentVote, setCurrentVote] = useState<'red' | 'blue' | null>(null);
   const [showResult, setShowResult] = useState(false);
@@ -51,7 +52,8 @@ export function AudiencePoll({ currentRound, phase, roundWinner }: AudiencePollP
   const handleVote = useCallback((agent: 'red' | 'blue') => {
     if (currentVote || phase === 'round_end' || phase === 'match_end') return;
     setCurrentVote(agent);
-  }, [currentVote, phase]);
+    onVote?.(agent);
+  }, [currentVote, phase, onVote]);
 
   const canVote = phase === 'thinking' || phase === 'committed' || phase === 'revealed';
   const lastVote = votes.find(v => v.round === currentRound);
