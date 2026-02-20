@@ -71,12 +71,7 @@ class Match:
                 )
             else:
                 self.game_state = GameState(total_rounds=self.config.total_rounds)
-        if self.red_agent is None:
-            self.red_agent = AgentPredictor("red", self.config.red_personality, game_type=gt)
-        if self.blue_agent is None:
-            self.blue_agent = AgentPredictor("blue", self.config.blue_personality, game_type=gt)
-
-        # Lazy-load optional integrations
+        # Lazy-load optional integrations first (agents need these)
         try:
             from backend.neo4j_client import get_neo4j_client
             self._neo4j_client = get_neo4j_client()
@@ -94,6 +89,17 @@ class Match:
             self._metrics = arena_metrics
         except Exception:
             pass
+
+        if self.red_agent is None:
+            self.red_agent = AgentPredictor(
+                "red", self.config.red_personality, game_type=gt,
+                neo4j_client=self._neo4j_client, metrics=self._metrics,
+            )
+        if self.blue_agent is None:
+            self.blue_agent = AgentPredictor(
+                "blue", self.config.blue_personality, game_type=gt,
+                neo4j_client=self._neo4j_client, metrics=self._metrics,
+            )
 
     async def run_match(self) -> AsyncGenerator[dict, None]:
         """Run the complete match, yielding WebSocket-ready event dicts."""
@@ -463,12 +469,16 @@ class Match:
         """Get prediction from an agent with error handling."""
         try:
             if agent == "red":
+                opponent_personality = self.config.blue_personality
                 return await self.red_agent.predict_opponent(
-                    self.game_state, self.blue_history, self.red_history
+                    self.game_state, self.blue_history, self.red_history,
+                    opponent_personality=opponent_personality,
                 )
             else:
+                opponent_personality = self.config.red_personality
                 return await self.blue_agent.predict_opponent(
-                    self.game_state, self.red_history, self.blue_history
+                    self.game_state, self.red_history, self.blue_history,
+                    opponent_personality=opponent_personality,
                 )
         except Exception as e:
             logger.error("Agent %s prediction failed: %s", agent, e)

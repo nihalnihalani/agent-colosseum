@@ -68,7 +68,7 @@ export default function Home() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'live' | 'mock' | 'offline'>('checking');
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8888';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     fetch(`${apiUrl}/health`)
       .then((r) => r.json())
       .then((d) => setBackendStatus(d.mock_mode ? 'mock' : 'live'))

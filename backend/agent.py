@@ -171,15 +171,37 @@ AGENT_PERSONALITIES: dict[str, dict[str, Any]] = {
 }
 
 
+def _build_intelligence_block(context: dict) -> str:
+    """Format Neo4j patterns and accuracy into a prompt block. Returns '' if empty."""
+    lines = []
+    patterns = context.get("counter_patterns") or []
+    accuracy = context.get("recent_accuracy")
+
+    if patterns:
+        lines.append("\n[INTELLIGENCE CONTEXT]")
+        lines.append("Counter-strategy patterns from historical matches:")
+        for p in patterns[:3]:
+            lines.append(f"  - {p}")
+
+    if accuracy is not None:
+        if not lines:
+            lines.append("\n[INTELLIGENCE CONTEXT]")
+        lines.append(f"Your recent prediction accuracy: {accuracy}%")
+
+    return "\n".join(lines)
+
+
 def _build_system_prompt(
     agent_name: str,
     personality: str,
     game_state: GameState,
     my_history: list[dict],
     opponent_history: list[dict],
+    intelligence_context: dict | None = None,
 ) -> str:
     config = AGENT_PERSONALITIES.get(personality, AGENT_PERSONALITIES["adaptive"])
-    return f"""You are {agent_name}, a competitor in Agent Colosseum.
+    intel_block = _build_intelligence_block(intelligence_context or {})
+    base = f"""You are {agent_name}, a competitor in Agent Colosseum.
 
 GAME: resource_wars
 YOUR PERSONALITY: {config['description']}
@@ -233,6 +255,7 @@ Return ONLY valid JSON:
   }},
   "reasoning": "<why you chose this move>"
 }}"""
+    return f"{base}{intel_block}" if intel_block else base
 
 
 # ---------------------------------------------------------------------------
@@ -432,10 +455,12 @@ def _build_negotiation_prompt(
     game_state: NegotiationState,
     my_history: list[dict],
     opponent_history: list[dict],
+    intelligence_context: dict | None = None,
 ) -> str:
     config = AGENT_PERSONALITIES.get(personality, AGENT_PERSONALITIES["adaptive"])
+    intel_block = _build_intelligence_block(intelligence_context or {})
     role = "seller (wants HIGH price)" if agent_name == "red" else "buyer (wants LOW price)"
-    return f"""You are {agent_name}, a competitor in Agent Colosseum.
+    base = f"""You are {agent_name}, a competitor in Agent Colosseum.
 
 GAME: negotiation
 YOUR ROLE: {role}
@@ -473,6 +498,7 @@ Return ONLY valid JSON:
   }},
   "reasoning": "<why you chose this move>"
 }}"""
+    return f"{base}{intel_block}" if intel_block else base
 
 
 # ---------------------------------------------------------------------------
@@ -485,9 +511,11 @@ def _build_auction_prompt(
     game_state: AuctionState,
     my_history: list[dict],
     opponent_history: list[dict],
+    intelligence_context: dict | None = None,
 ) -> str:
     config = AGENT_PERSONALITIES.get(personality, AGENT_PERSONALITIES["adaptive"])
-    return f"""You are {agent_name}, a competitor in Agent Colosseum.
+    intel_block = _build_intelligence_block(intelligence_context or {})
+    base = f"""You are {agent_name}, a competitor in Agent Colosseum.
 
 GAME: auction
 YOUR PERSONALITY: {config['description']}
@@ -523,6 +551,7 @@ Return ONLY valid JSON:
   }},
   "reasoning": "<why you chose this move>"
 }}"""
+    return f"{base}{intel_block}" if intel_block else base
 
 
 # ---------------------------------------------------------------------------
@@ -690,12 +719,21 @@ def _generate_auction_mock_predictions(
 class AgentPredictor:
     """Prediction engine for a single agent. Supports Bedrock and mock modes."""
 
-    def __init__(self, agent_name: str, personality: str = "adaptive", game_type: str = "resource_wars"):
+    def __init__(
+        self,
+        agent_name: str,
+        personality: str = "adaptive",
+        game_type: str = "resource_wars",
+        neo4j_client=None,
+        metrics=None,
+    ):
         self.agent_name = agent_name
         self.personality = personality
         self.game_type = game_type
         self.mock_mode = os.getenv("MOCK_MODE", "true").lower() == "true"
         self._bedrock_client = None
+        self.neo4j_client = neo4j_client
+        self.metrics = metrics
 
     def _get_bedrock_client(self):
         if self._bedrock_client is None:
@@ -711,11 +749,12 @@ class AgentPredictor:
         game_state,
         opponent_history: list[dict],
         my_history: list[dict],
+        opponent_personality: str = "adaptive",
     ) -> PredictionResult:
         """Predict opponent's next move and choose our response."""
         if self.mock_mode:
             return await self._predict_mock(game_state, opponent_history, my_history)
-        return await self._predict_bedrock(game_state, opponent_history, my_history)
+        return await self._predict_bedrock(game_state, opponent_history, my_history, opponent_personality)
 
     async def _predict_mock(
         self,
@@ -738,18 +777,21 @@ class AgentPredictor:
             self.agent_name, self.personality, game_state, opponent_history, my_history
         )
 
-    def _build_prompt(self, game_state, my_history, opponent_history) -> str:
+    def _build_prompt(self, game_state, my_history, opponent_history, intelligence_context: dict | None = None) -> str:
         """Build the appropriate prompt based on game type."""
         if self.game_type == "negotiation":
             return _build_negotiation_prompt(
-                self.agent_name, self.personality, game_state, my_history, opponent_history
+                self.agent_name, self.personality, game_state, my_history, opponent_history,
+                intelligence_context=intelligence_context,
             )
         elif self.game_type == "auction":
             return _build_auction_prompt(
-                self.agent_name, self.personality, game_state, my_history, opponent_history
+                self.agent_name, self.personality, game_state, my_history, opponent_history,
+                intelligence_context=intelligence_context,
             )
         return _build_system_prompt(
-            self.agent_name, self.personality, game_state, my_history, opponent_history
+            self.agent_name, self.personality, game_state, my_history, opponent_history,
+            intelligence_context=intelligence_context,
         )
 
     def _parse_chosen_move(self, parsed: dict):
@@ -786,18 +828,71 @@ class AgentPredictor:
             self.agent_name, self.personality, game_state, opponent_history, my_history
         )
 
+    async def _get_neo4j_patterns(self, opponent_personality: str) -> list[str]:
+        """Fetch counter-strategy patterns from Neo4j for the given opponent personality."""
+        if self.neo4j_client is None:
+            return []
+        try:
+            # Check which method exists on the client
+            method = None
+            if hasattr(self.neo4j_client, 'get_counter_strategies'):
+                method = self.neo4j_client.get_counter_strategies
+            elif hasattr(self.neo4j_client, 'get_counter_strategy'):
+                method = self.neo4j_client.get_counter_strategy
+            if method is None:
+                return []
+            patterns = await asyncio.wait_for(
+                asyncio.to_thread(method, self.agent_name, opponent_personality),
+                timeout=0.5,
+            )
+            # Normalize: patterns may be list of strings or list of dicts
+            if not patterns:
+                return []
+            result = []
+            for p in patterns:
+                if isinstance(p, str):
+                    result.append(p)
+                elif isinstance(p, dict):
+                    result.append(str(p.get('pattern') or p.get('description') or p))
+            return result
+        except Exception as e:
+            logger.debug("Neo4j pattern fetch failed: %s", e)
+            return []
+
+    def _get_self_accuracy(self) -> Optional[dict]:
+        """Return recent prediction accuracy if metrics available. Currently a stub."""
+        if self.metrics is None:
+            return None
+        # ArenaMetrics is write-only (DogStatsD). Accuracy tracking via
+        # round-level counters on AgentPredictor is a future enhancement.
+        return None
+
+    async def _fetch_intelligence_context(self, opponent_personality: str) -> dict:
+        """Fetch Neo4j patterns and self accuracy in parallel. Never raises."""
+        try:
+            neo4j_patterns = await self._get_neo4j_patterns(opponent_personality)
+        except Exception:
+            neo4j_patterns = []
+        self_accuracy = self._get_self_accuracy()
+        return {
+            "counter_patterns": neo4j_patterns if isinstance(neo4j_patterns, list) else [],
+            "recent_accuracy": self_accuracy,
+        }
+
     async def _predict_bedrock(
         self,
         game_state,
         opponent_history: list[dict],
         my_history: list[dict],
+        opponent_personality: str = "adaptive",
     ) -> PredictionResult:
         """Call Amazon Bedrock Claude for opponent prediction, wrapped with LLM Obs."""
         client = self._get_bedrock_client()
         model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-sonnet-4-5-20250929-v1:0")
         config = AGENT_PERSONALITIES.get(self.personality, AGENT_PERSONALITIES["adaptive"])
 
-        prompt = self._build_prompt(game_state, my_history, opponent_history)
+        intelligence_context = await self._fetch_intelligence_context(opponent_personality)
+        prompt = self._build_prompt(game_state, my_history, opponent_history, intelligence_context)
 
         with _llmobs_prediction_span(self.agent_name, self.personality, game_state.to_dict()):
             try:
