@@ -83,6 +83,7 @@ export function useMatchWebSocket(matchId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const mockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
+  const pendingConfigRef = useRef<MatchConfig | null>(null);
   const isMock = process.env.NEXT_PUBLIC_MOCK_WS === 'true';
   const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -463,7 +464,7 @@ export function useMatchWebSocket(matchId: string | null) {
   useEffect(() => {
     if (!matchId || isMock) return;
 
-    const wsHost = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8888';
+    const wsHost = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
     const wsUrl = `${wsHost}/ws/match/${matchId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -472,6 +473,14 @@ export function useMatchWebSocket(matchId: string | null) {
       setIsConnected(true);
       setError(null);
       reconnectAttempts.current = 0;
+      // Drain any pending start_match that was queued before the connection opened
+      if (pendingConfigRef.current) {
+        ws.send(JSON.stringify({
+          type: 'start_match',
+          ...pendingConfigRef.current,
+        }));
+        pendingConfigRef.current = null;
+      }
     };
 
     ws.onmessage = (event) => {
@@ -525,6 +534,9 @@ export function useMatchWebSocket(matchId: string | null) {
             rounds: config.totalRounds,
           })
         );
+      } else {
+        // Queue the config to be sent as soon as the socket opens
+        pendingConfigRef.current = config;
       }
     },
     [isMock, runMockMatch]
