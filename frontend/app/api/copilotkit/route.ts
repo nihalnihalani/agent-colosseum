@@ -9,7 +9,7 @@ import { NextRequest } from "next/server";
 const backendUrl =
   process.env.NEXT_PUBLIC_COPILOTKIT_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8888";
+  "http://127.0.0.1:8000";
 
 const arenaCommentator = new HttpAgent({
   url: `${backendUrl}/copilotkit_api`,
