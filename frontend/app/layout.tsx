@@ -28,6 +28,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${rajdhani.variable} antialiased bg-[#030304] text-[#ededed] selection:bg-white/20 selection:text-white`}>
+        <script
+          type="importmap"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              imports: {
+                three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+              },
+            }),
+          }}
+        />
         <CopilotKitProvider>{children}</CopilotKitProvider>
       </body>
     </html>
