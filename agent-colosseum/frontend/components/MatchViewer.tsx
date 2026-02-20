@@ -118,18 +118,32 @@ function MatchEndOverlay({ matchState }: { matchState: MatchState }) {
             </div>
           </div>
           
-          <div className="flex justify-center gap-4">
-            <button 
+          <div className="flex flex-wrap justify-center gap-3">
+            <button
               onClick={() => router.push('/')}
-              className="px-8 py-3 bg-white text-black hover:bg-zinc-200 rounded-lg text-sm font-medium transition-colors"
+              className="px-6 py-3 bg-white text-black hover:bg-zinc-200 rounded-lg text-sm font-medium transition-colors"
             >
               Return to Lobby
             </button>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-8 py-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors"
+            {matchState.matchId && (
+              <button
+                onClick={() => router.push(`/replay/${matchState.matchId}`)}
+                className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors"
+              >
+                View Replay
+              </button>
+            )}
+            <button
+              onClick={() => router.push('/history')}
+              className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors"
             >
-              Replay Match
+              Match History
+            </button>
+            <button
+              onClick={() => router.push('/leaderboard')}
+              className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-sm font-medium transition-colors"
+            >
+              Leaderboard
             </button>
           </div>
         </div>
