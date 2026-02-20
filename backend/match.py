@@ -140,6 +140,27 @@ class Match:
 
         # --- match_end ---
         winner = self._get_winner()
+
+        # --- Record strategy relationship in Neo4j ---
+        if self._neo4j_client and winner in ("red", "blue"):
+            loser = "blue" if winner == "red" else "red"
+            winner_personality = (
+                self.config.red_personality if winner == "red"
+                else self.config.blue_personality
+            )
+            loser_personality = (
+                self.config.blue_personality if winner == "red"
+                else self.config.red_personality
+            )
+            try:
+                await self._neo4j_client.store_strategy_relationship(
+                    winner_strategy=winner_personality,
+                    loser_strategy=loser_personality,
+                    match_id=self.config.match_id,
+                )
+            except Exception as e:
+                logger.warning("Neo4j strategy relationship storage failed: %s", e)
+
         red_accuracy = (
             self.red_correct / self.red_total_predictions
             if self.red_total_predictions > 0
@@ -366,6 +387,8 @@ class Match:
                             "state_hash": state_before.state_hash(),
                             "red_move": red_move.to_dict(),
                             "blue_move": blue_move.to_dict(),
+                            "red_predictions": red_preds_annotated,
+                            "blue_predictions": blue_preds_annotated,
                         },
                     )
                 elif gt == "auction":
@@ -377,6 +400,8 @@ class Match:
                             "item_name": current_item.name if current_item else "",
                             "red_move": red_move.to_dict(),
                             "blue_move": blue_move.to_dict(),
+                            "red_predictions": red_preds_annotated,
+                            "blue_predictions": blue_preds_annotated,
                         },
                     )
                 else:
