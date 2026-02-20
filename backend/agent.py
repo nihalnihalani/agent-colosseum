@@ -79,8 +79,12 @@ def _llmobs_submit_evaluation(
     Must be called after round resolution when actual_move is known.
     span_context should be the LLMObs exported span from prediction time,
     stored on PredictionResult.llmobs_span.
+
+    No-ops silently when LLMObs is disabled, span_context is None (e.g. mock
+    mode where PredictionResult.llmobs_span is never populated), or actual_move
+    is empty.
     """
-    if not _llmobs_enabled or span_context is None:
+    if not _llmobs_enabled or span_context is None or not actual_move:
         return
 
     try:
@@ -96,7 +100,7 @@ def _llmobs_submit_evaluation(
                     "agent": agent_name,
                     "predicted_move": predicted,
                     "actual_move": actual_move,
-                    "confidence": str(pred.get("confidence", 0)),
+                    "confidence": str(pred.get("confidence", 0.0)),
                 },
             )
     except Exception as e:
