@@ -118,9 +118,11 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
               <div key={`${moment.round}-${i}`} className="flex items-start gap-2 text-[10px]">
                 <span className="font-mono text-zinc-600 shrink-0">R{moment.round}</span>
                 <span className="text-zinc-400 truncate">{moment.event}</span>
-                {moment.impact === 'positive' ? (
+                {(moment.impact === 'high' || moment.impact === 'positive') ? (
                   <TrendingUp className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
-                ) : moment.impact === 'negative' ? (
+                ) : (moment.impact === 'medium') ? (
+                  <Zap className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                ) : (moment.impact === 'low' || moment.impact === 'negative') ? (
                   <TrendingDown className="w-2.5 h-2.5 text-rose-400 shrink-0" />
                 ) : null}
               </div>
