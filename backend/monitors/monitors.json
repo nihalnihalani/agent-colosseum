@@ -1,0 +1,96 @@
+{
+  "monitors": [
+    {
+      "name": "[Agent Colosseum] Prediction Latency P95 > 3s",
+      "type": "metric alert",
+      "query": "percentile(last_5m):p95:arena.round.latency{*} by {agent} > 3000",
+      "message": "P95 prediction latency for agent {{agent.name}} exceeded 3 seconds.\n\nCurrent value: {{value}} ms\n\nThis may indicate Bedrock throttling or degraded model performance.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "options": {
+        "thresholds": {
+          "critical": 3000,
+          "warning": 2000
+        },
+        "notify_no_data": false,
+        "renotify_interval": 300,
+        "escalation_message": "Prediction latency still elevated after 5 minutes."
+      }
+    },
+    {
+      "name": "[Agent Colosseum] Prediction Accuracy Below 30%",
+      "type": "metric alert",
+      "query": "sum(last_10m):sum:arena.predictions.correct{*} by {agent}.as_count() / sum:arena.predictions.total{*} by {agent}.as_count() < 0.3",
+      "message": "Prediction accuracy for agent {{agent.name}} dropped below 30%.\n\nThis suggests the model may be producing low-quality predictions or the opponent has shifted strategy significantly.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "options": {
+        "thresholds": {
+          "critical": 0.3,
+          "warning": 0.4
+        },
+        "notify_no_data": false,
+        "renotify_interval": 600
+      }
+    },
+    {
+      "name": "[Agent Colosseum] High Error Rate",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:arena.predictions.total{*}.as_count() - sum:arena.predictions.correct{*}.as_count() - sum:arena.predictions.wrong{*}.as_count() > 10",
+      "message": "Elevated error count detected — predictions are failing to resolve (neither correct nor wrong).\n\nThis likely indicates Bedrock API errors or JSON parsing failures.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "options": {
+        "thresholds": {
+          "critical": 10,
+          "warning": 5
+        },
+        "notify_no_data": false,
+        "renotify_interval": 300
+      }
+    },
+    {
+      "name": "[Agent Colosseum] Match Completion Drop",
+      "type": "metric alert",
+      "query": "sum(last_15m):sum:arena.matches.completed{*}.as_count() < 1",
+      "message": "No matches have completed in the last 15 minutes.\n\nCheck that the match server is running and WebSocket connections are healthy.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:match-server"],
+      "options": {
+        "thresholds": {
+          "critical": 1
+        },
+        "notify_no_data": true,
+        "no_data_timeframe": 20,
+        "renotify_interval": 900
+      }
+    },
+    {
+      "name": "[Agent Colosseum] Token Cost Spike",
+      "type": "metric alert",
+      "query": "avg(last_5m):avg:arena.tokens.per_prediction{*} > 2000",
+      "message": "Average tokens per prediction exceeded 2000.\n\nCurrent value: {{value}} tokens\n\nThis may indicate prompt bloat or unexpected model behavior.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:predictor"],
+      "options": {
+        "thresholds": {
+          "critical": 2000,
+          "warning": 1500
+        },
+        "notify_no_data": false,
+        "renotify_interval": 600
+      }
+    },
+    {
+      "name": "[Agent Colosseum] WebSocket Connection Health",
+      "type": "service check",
+      "query": "\"arena.websocket.health\".over(\"service:match-server\").last(3).count_by_status()",
+      "message": "WebSocket health check is failing.\n\nClients may be unable to connect to active matches.\n\n@slack-agent-colosseum-alerts",
+      "tags": ["service:agent-colosseum", "component:match-server"],
+      "options": {
+        "thresholds": {
+          "critical": 3,
+          "warning": 1,
+          "ok": 1
+        },
+        "notify_no_data": true,
+        "no_data_timeframe": 10
+      }
+    }
+  ]
+}

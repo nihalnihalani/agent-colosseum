@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+uvicorn>=0.32.0
+websockets>=13.0
+boto3>=1.35.0
+neo4j>=5.25.0
+pymongo>=4.10.0
+ddtrace>=2.18.0
+datadog>=0.50.0
+python-dotenv>=1.0.0
+pydantic>=2.10.0
+ag-ui-protocol>=0.1.11
+copilotkit>=0.1.39

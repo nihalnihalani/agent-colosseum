@@ -1,0 +1,204 @@
+{
+  "title": "Agent Colosseum — War Room",
+  "description": "Live match dashboard for real-time monitoring of agent battles",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "Active Matches",
+        "type": "query_value",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.matches.completed{*}.as_count()",
+                "aggregator": "sum"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "scalar"
+          }
+        ],
+        "autoscale": true,
+        "precision": 0
+      }
+    },
+    {
+      "definition": {
+        "title": "Round Latency (P95) by Agent",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "p95:arena.round.latency{*} by {agent}"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "ms", "min": "0" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Prediction Accuracy — Red vs Blue",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "correct",
+                "query": "sum:arena.predictions.correct{*} by {agent}.as_count()"
+              },
+              {
+                "data_source": "metrics",
+                "name": "total",
+                "query": "sum:arena.predictions.total{*} by {agent}.as_count()"
+              }
+            ],
+            "formulas": [
+              { "formula": "(correct / total) * 100", "alias": "Accuracy %" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ],
+        "yaxis": { "label": "%", "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Live Confidence Scores",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "avg:arena.prediction.confidence{*} by {agent}"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "min": "0", "max": "1" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Strategy Shifts",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "sum:arena.strategy.shifts{*} by {agent,to}.as_count()"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Score Differential",
+        "type": "query_value",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "avg:arena.match.score_diff{*}",
+                "aggregator": "last"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "scalar"
+          }
+        ],
+        "autoscale": true,
+        "precision": 1
+      }
+    },
+    {
+      "definition": {
+        "title": "Imagination Tree Depth",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "branches",
+                "query": "avg:arena.imagination.branches{*} by {agent}"
+              },
+              {
+                "data_source": "metrics",
+                "name": "depth",
+                "query": "avg:arena.imagination.depth{*} by {agent}"
+              }
+            ],
+            "formulas": [
+              { "formula": "branches", "alias": "Branches" },
+              { "formula": "depth", "alias": "Depth" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Match Duration (ms)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "query1",
+                "query": "avg:arena.match.duration_ms{*}"
+              }
+            ],
+            "formulas": [{ "formula": "query1" }],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "label": "ms", "min": "0" }
+      }
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "fixed",
+  "template_variables": [
+    {
+      "name": "agent",
+      "prefix": "agent",
+      "default": "*"
+    },
+    {
+      "name": "match_id",
+      "prefix": "match_id",
+      "default": "*"
+    }
+  ]
+}
