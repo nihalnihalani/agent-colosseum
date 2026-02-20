@@ -49,9 +49,10 @@ export function ScoreDisplay({
   totalFuturesSimulated,
   phase,
 }: ScoreDisplayProps) {
-  const total = scores.red + scores.blue || 1;
-  const redPercent = (scores.red / total) * 100;
-  const bluePercent = (scores.blue / total) * 100;
+  const safeScores = scores ?? { red: 0, blue: 0 };
+  const total = (safeScores.red + safeScores.blue) || 1;
+  const redPercent = (safeScores.red / total) * 100;
+  const bluePercent = (safeScores.blue / total) * 100;
 
   return (
     <motion.div
@@ -102,7 +103,7 @@ export function ScoreDisplay({
           <div className="absolute inset-0 bg-rose-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
           <div className="relative">
              <div className="text-7xl font-sans font-bold tracking-tighter text-white">
-               <AnimatedNumber value={scores.red} />
+               <AnimatedNumber value={safeScores.red} />
              </div>
              <div className="text-xs text-rose-400 font-medium uppercase tracking-widest mt-2">Agent Red</div>
           </div>
@@ -118,7 +119,7 @@ export function ScoreDisplay({
           <div className="absolute inset-0 bg-indigo-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
           <div className="relative">
              <div className="text-7xl font-sans font-bold tracking-tighter text-white">
-               <AnimatedNumber value={scores.blue} />
+               <AnimatedNumber value={safeScores.blue} />
              </div>
              <div className="text-xs text-indigo-400 font-medium uppercase tracking-widest mt-2">Agent Blue</div>
           </div>

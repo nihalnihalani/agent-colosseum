@@ -23,6 +23,13 @@ from backend.auction_engine import (
     AuctionMove,
     AuctionState,
 )
+from backend.gpu_auction_engine import (
+    GPUBidMoveType,
+    GPUBidMove,
+    NeocloudMoveType,
+    NeocloudMove,
+    GPUAuctionState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -684,6 +691,202 @@ def _generate_auction_mock_predictions(
 
 
 # ---------------------------------------------------------------------------
+# GPU Auction (Neocloud) Mock Predictions
+# ---------------------------------------------------------------------------
+
+GPU_USER_WEIGHTS = {
+    "aggressive": {GPUBidMoveType.BID: 0.4, GPUBidMoveType.SURGE_BID: 0.4, GPUBidMoveType.WAIT: 0.1, GPUBidMoveType.PASS: 0.1},
+    "defensive": {GPUBidMoveType.BID: 0.3, GPUBidMoveType.SURGE_BID: 0.1, GPUBidMoveType.WAIT: 0.4, GPUBidMoveType.PASS: 0.2},
+    "adaptive": {GPUBidMoveType.BID: 0.4, GPUBidMoveType.SURGE_BID: 0.2, GPUBidMoveType.WAIT: 0.3, GPUBidMoveType.PASS: 0.1},
+    "chaotic": {GPUBidMoveType.BID: 0.3, GPUBidMoveType.SURGE_BID: 0.3, GPUBidMoveType.WAIT: 0.2, GPUBidMoveType.PASS: 0.2},
+}
+
+GPU_NEOCLOUD_WEIGHTS = {
+    "aggressive": {NeocloudMoveType.SURGE_PRICING: 0.5, NeocloudMoveType.SET_PRICE: 0.3, NeocloudMoveType.DISCOUNT: 0.1, NeocloudMoveType.HOLD: 0.1},
+    "defensive": {NeocloudMoveType.SURGE_PRICING: 0.1, NeocloudMoveType.SET_PRICE: 0.3, NeocloudMoveType.DISCOUNT: 0.3, NeocloudMoveType.HOLD: 0.3},
+    "adaptive": {NeocloudMoveType.SURGE_PRICING: 0.3, NeocloudMoveType.SET_PRICE: 0.3, NeocloudMoveType.DISCOUNT: 0.2, NeocloudMoveType.HOLD: 0.2},
+    "chaotic": {NeocloudMoveType.SURGE_PRICING: 0.3, NeocloudMoveType.SET_PRICE: 0.2, NeocloudMoveType.DISCOUNT: 0.3, NeocloudMoveType.HOLD: 0.2},
+}
+
+
+def _generate_gpu_auction_mock_predictions(
+    agent_name: str,
+    personality: str,
+    game_state: GPUAuctionState,
+    opponent_history: list[dict],
+    my_history: list[dict],
+) -> PredictionResult:
+    """Generate mock predictions for GPU bidding game."""
+    config = AGENT_PERSONALITIES.get(personality, AGENT_PERSONALITIES["adaptive"])
+    
+    is_user = agent_name == "red"  # Red = user/bidder, Blue = neocloud
+    
+    if is_user:
+        weights = GPU_USER_WEIGHTS.get(personality, GPU_USER_WEIGHTS["adaptive"])
+        opp_weights = GPU_NEOCLOUD_WEIGHTS.get("adaptive")
+    else:
+        weights = GPU_NEOCLOUD_WEIGHTS.get(personality, GPU_NEOCLOUD_WEIGHTS["adaptive"])
+        opp_weights = GPU_USER_WEIGHTS.get("adaptive")
+
+    def _weighted_choice(w: dict):
+        types = list(w.keys())
+        probs = list(w.values())
+        return random.choices(types, weights=probs, k=1)[0]
+
+    current_gpu = game_state.current_gpu
+    market_demand = game_state.market_demand
+
+    predictions = []
+    for i in range(3):
+        if is_user:
+            pred_type = _weighted_choice(opp_weights)
+            pred_adjustment = round(random.uniform(-0.2, 0.4), 2)
+            conf = round(random.uniform(0.3, 0.7), 2) if i == 0 else round(random.uniform(0.1, 0.3), 2)
+            predictions.append({
+                "type": pred_type.value,
+                "priceAdjustment": pred_adjustment,
+                "confidence": conf,
+                "reasoning": f"Neocloud likely to {pred_type.value} based on demand {market_demand:.0%}",
+            })
+        else:
+            pred_type = _weighted_choice(opp_weights)
+            pred_amount = int((current_gpu.current_price if current_gpu else 100) * random.uniform(0.8, 1.3))
+            conf = round(random.uniform(0.3, 0.7), 2) if i == 0 else round(random.uniform(0.1, 0.3), 2)
+            predictions.append({
+                "type": pred_type.value,
+                "amount": pred_amount,
+                "confidence": conf,
+                "reasoning": f"User likely to {pred_type.value} around ${pred_amount}",
+            })
+
+    # Choose our move
+    if is_user:
+        chosen_type = _weighted_choice(weights)
+        budget = game_state.user_budget
+        gpu_price = current_gpu.current_price if current_gpu else 100
+        
+        if chosen_type == GPUBidMoveType.PASS:
+            amount = 0
+        elif chosen_type == GPUBidMoveType.WAIT:
+            amount = 0
+        elif chosen_type == GPUBidMoveType.SURGE_BID:
+            amount = min(budget, int(gpu_price * 1.4))
+        else:
+            risk = config["risk_tolerance"]
+            amount = min(budget, int(gpu_price * (0.9 + risk * 0.3)))
+        
+        chosen_move = GPUBidMove(
+            type=chosen_type,
+            amount=amount,
+            gpu_type=current_gpu.name if current_gpu else "",
+            hours=1,
+        )
+        reasoning = f"{'Aggressive' if personality == 'aggressive' else 'Strategic'} bid of ${amount} for {current_gpu.name if current_gpu else 'GPU'}"
+    else:
+        chosen_type = _weighted_choice(weights)
+        
+        if chosen_type == NeocloudMoveType.SURGE_PRICING:
+            adjustment = round(random.uniform(0.15, 0.4), 2)
+        elif chosen_type == NeocloudMoveType.DISCOUNT:
+            adjustment = round(random.uniform(0.1, 0.25), 2)
+        else:
+            adjustment = round(random.uniform(-0.1, 0.1), 2)
+        
+        chosen_move = NeocloudMove(
+            type=chosen_type,
+            price_adjustment=adjustment,
+            target_gpu=current_gpu.name if current_gpu else "",
+        )
+        reasoning = f"{'Surge pricing' if chosen_type == NeocloudMoveType.SURGE_PRICING else chosen_type.value} with {adjustment:+.0%} adjustment (demand: {market_demand:.0%})"
+
+    return PredictionResult(
+        predictions=predictions,
+        chosen_move=chosen_move,
+        reasoning=reasoning,
+    )
+
+
+def _build_gpu_auction_prompt(
+    agent_name: str,
+    personality: str,
+    game_state: GPUAuctionState,
+    my_history: list[dict],
+    opponent_history: list[dict],
+) -> str:
+    """Build prompt for GPU auction game."""
+    is_user = agent_name == "red"
+    role = "GPU resource bidder (user)" if is_user else "Neocloud pricing optimizer"
+    objective = "acquire GPU compute at optimal cost" if is_user else "maximize revenue through dynamic pricing"
+    
+    state_dict = game_state.to_dict_for_agent(agent_name)
+    current_gpu = game_state.current_gpu
+    
+    if is_user:
+        move_types = [t.value for t in GPUBidMoveType]
+        extra_context = f"""
+Your budget: ${game_state.user_budget}
+Compute acquired: {game_state.user_compute_acquired} units
+Current GPU: {current_gpu.name if current_gpu else 'N/A'} @ ${current_gpu.current_price if current_gpu else 0}/hr
+Market demand: {game_state.market_demand:.0%}
+Surge active: {current_gpu.surge_active if current_gpu else False}
+
+Strategy considerations:
+- BID: Standard bid at or near current price
+- SURGE_BID: Pay 30% premium for guaranteed access
+- WAIT: Skip this round, demand may decrease
+- PASS: Skip without affecting demand
+"""
+    else:
+        move_types = [t.value for t in NeocloudMoveType]
+        extra_context = f"""
+Total revenue: ${game_state.neocloud_revenue}
+Resources sold: {game_state.neocloud_resources_sold}
+Current GPU: {current_gpu.name if current_gpu else 'N/A'} (base: ${current_gpu.base_price if current_gpu else 0})
+Market demand: {game_state.market_demand:.0%}
+
+Strategy considerations:
+- SURGE_PRICING: Increase price when demand is high (>70%)
+- SET_PRICE: Set specific price adjustment
+- DISCOUNT: Reduce price to attract bids when demand is low
+- HOLD: Maintain current pricing
+"""
+
+    amount_field = '"amount": bid_amount,' if is_user else '"priceAdjustment": adjustment_percent,'
+    
+    prompt = f"""You are a {role} in a GPU resource marketplace simulation.
+
+PERSONALITY: {personality}
+OBJECTIVE: {objective}
+
+CURRENT STATE:
+Round: {game_state.current_round}/{game_state.total_rounds}
+{extra_context}
+
+OPPONENT HISTORY (last 3 moves):
+{json.dumps(opponent_history[-3:], indent=2) if opponent_history else "No history yet"}
+
+YOUR HISTORY (last 3 moves):
+{json.dumps(my_history[-3:], indent=2) if my_history else "No history yet"}
+
+AVAILABLE MOVES: {move_types}
+
+Respond with JSON:
+{{
+  "predictions": [
+    {{"type": "predicted_move", "confidence": 0.6, "reasoning": "why"}},
+    {{"type": "alternate_move", "confidence": 0.3, "reasoning": "why"}}
+  ],
+  "chosenMove": {{
+    "type": "your_move_type",
+    {amount_field}
+    "reasoning": "why this move"
+  }}
+}}
+"""
+    return prompt
+
+
+# ---------------------------------------------------------------------------
 # AgentPredictor — main class
 # ---------------------------------------------------------------------------
 
@@ -734,6 +937,10 @@ class AgentPredictor:
             return _generate_auction_mock_predictions(
                 self.agent_name, self.personality, game_state, opponent_history, my_history
             )
+        elif self.game_type == "gpu_bidding":
+            return _generate_gpu_auction_mock_predictions(
+                self.agent_name, self.personality, game_state, opponent_history, my_history
+            )
         return _generate_mock_predictions(
             self.agent_name, self.personality, game_state, opponent_history, my_history
         )
@@ -746,6 +953,10 @@ class AgentPredictor:
             )
         elif self.game_type == "auction":
             return _build_auction_prompt(
+                self.agent_name, self.personality, game_state, my_history, opponent_history
+            )
+        elif self.game_type == "gpu_bidding":
+            return _build_gpu_auction_prompt(
                 self.agent_name, self.personality, game_state, my_history, opponent_history
             )
         return _build_system_prompt(
@@ -766,6 +977,21 @@ class AgentPredictor:
                 type=AuctionMoveType(chosen.get("type", "bid")),
                 amount=int(chosen.get("amount", 50)),
             )
+        elif self.game_type == "gpu_bidding":
+            is_user = self.agent_name == "red"
+            if is_user:
+                return GPUBidMove(
+                    type=GPUBidMoveType(chosen.get("type", "bid")),
+                    amount=int(chosen.get("amount", 100)),
+                    gpu_type=chosen.get("gpuType", ""),
+                    hours=int(chosen.get("hours", 1)),
+                )
+            else:
+                return NeocloudMove(
+                    type=NeocloudMoveType(chosen.get("type", "hold")),
+                    price_adjustment=float(chosen.get("priceAdjustment", 0.0)),
+                    target_gpu=chosen.get("targetGpu", ""),
+                )
         return Move(
             type=MoveType(chosen.get("type", "defensive_spread")),
             target=Resource(chosen.get("target", "A")),
@@ -780,6 +1006,10 @@ class AgentPredictor:
             )
         elif self.game_type == "auction":
             return _generate_auction_mock_predictions(
+                self.agent_name, self.personality, game_state, opponent_history, my_history
+            )
+        elif self.game_type == "gpu_bidding":
+            return _generate_gpu_auction_mock_predictions(
                 self.agent_name, self.personality, game_state, opponent_history, my_history
             )
         return _generate_mock_predictions(

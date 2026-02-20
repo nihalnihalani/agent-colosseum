@@ -21,6 +21,7 @@ from backend.game_engine import (
 )
 from backend import negotiation_engine
 from backend import auction_engine
+from backend import gpu_auction_engine
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,10 @@ class Match:
             elif gt == "auction":
                 self.game_state = auction_engine.AuctionState(
                     total_rounds=min(self.config.total_rounds, auction_engine.TOTAL_ITEMS),
+                )
+            elif gt == "gpu_bidding":
+                self.game_state = gpu_auction_engine.GPUAuctionState(
+                    total_rounds=self.config.total_rounds,
                 )
             else:
                 self.game_state = GameState(total_rounds=self.config.total_rounds)
@@ -136,6 +141,9 @@ class Match:
                 yield event
 
             self.game_state.round_number += 1
+            # Keep current_round in sync for gpu_bidding
+            if self.config.game_type == "gpu_bidding":
+                self.game_state.current_round = self.game_state.round_number
             await asyncio.sleep(self.config.round_delay)
 
         # --- match_end ---
@@ -205,6 +213,8 @@ class Match:
             return negotiation_engine.is_game_over(self.game_state)
         elif gt == "auction":
             return auction_engine.is_game_over(self.game_state)
+        elif gt == "gpu_bidding":
+            return gpu_auction_engine.is_gpu_game_over(self.game_state)
         return is_game_over(self.game_state)
 
     def _get_winner(self) -> str:
@@ -213,14 +223,21 @@ class Match:
             return negotiation_engine.get_winner(self.game_state)
         elif gt == "auction":
             return auction_engine.get_winner(self.game_state)
+        elif gt == "gpu_bidding":
+            return gpu_auction_engine.get_gpu_winner(self.game_state)
         return get_winner(self.game_state)
 
-    def _default_move(self):
+    def _default_move(self, agent: str = "red"):
         gt = self.config.game_type
         if gt == "negotiation":
             return negotiation_engine.default_move()
         elif gt == "auction":
             return auction_engine.default_move()
+        elif gt == "gpu_bidding":
+            if agent == "red":
+                return gpu_auction_engine.default_user_move(self.game_state)
+            else:
+                return gpu_auction_engine.default_neocloud_move(self.game_state)
         return default_move()
 
     def _resolve_round(self, red_move, blue_move):
@@ -229,12 +246,21 @@ class Match:
             return negotiation_engine.resolve_round(red_move, blue_move, self.game_state)
         elif gt == "auction":
             return auction_engine.resolve_round(red_move, blue_move, self.game_state)
+        elif gt == "gpu_bidding":
+            return gpu_auction_engine.resolve_gpu_round(self.game_state, red_move, blue_move)
         return resolve_round(red_move, blue_move, self.game_state)
 
     async def _run_round(self) -> AsyncGenerator[dict, None]:
         """Run a single round of the match."""
         round_num = self.game_state.round_number
         round_start_time = time.time()
+
+        # --- Pre-round setup for specific game types ---
+        if self.config.game_type == "gpu_bidding":
+            self.game_state.current_round = round_num
+            self.game_state.round_number = round_num
+            self.game_state.select_round_gpu()
+            self.game_state.update_market_demand()
 
         # --- round_start ---
         round_start_event = {
@@ -246,6 +272,8 @@ class Match:
             round_start_event["negotiationState"] = self.game_state.to_dict()
         elif self.config.game_type == "auction":
             round_start_event["auctionState"] = self.game_state.to_dict()
+        elif self.config.game_type == "gpu_bidding":
+            round_start_event["gpuBiddingState"] = self.game_state.to_dict()
         yield round_start_event
 
         # --- thinking phase (parallel) ---
@@ -295,8 +323,8 @@ class Match:
         }
 
         # --- Resolve the round ---
-        red_move = red_result.chosen_move or self._default_move()
-        blue_move = blue_result.chosen_move or self._default_move()
+        red_move = red_result.chosen_move or self._default_move("red")
+        blue_move = blue_result.chosen_move or self._default_move("blue")
 
         state_before = self.game_state.copy()
         resolution = self._resolve_round(red_move, blue_move)
@@ -317,6 +345,9 @@ class Match:
             actual_red_move_str = f"{red_move.type.value}_{red_move.price}"
         elif gt == "auction":
             actual_blue_move_str = f"{blue_move.type.value}_{blue_move.amount}"
+            actual_red_move_str = f"{red_move.type.value}_{red_move.amount}"
+        elif gt == "gpu_bidding":
+            actual_blue_move_str = f"{blue_move.type.value}_{blue_move.price_adjustment}"
             actual_red_move_str = f"{red_move.type.value}_{red_move.amount}"
         else:
             actual_blue_move_str = f"{blue_move.type.value}_{blue_move.target.value}"

@@ -1,4 +1,4 @@
-export type GameType = 'resource_wars' | 'negotiation' | 'auction';
+export type GameType = 'resource_wars' | 'negotiation' | 'auction' | 'gpu_bidding';
 
 export interface GameState {
   resources: { A: number; B: number; C: number };
@@ -34,6 +34,42 @@ export interface AuctionGameState {
   itemsRemaining: number;
   wonItems: { red: AuctionWonItem[]; blue: AuctionWonItem[] };
   bluffsUsed: { red: number; blue: number };
+}
+
+export interface GPUResource {
+  name: string;
+  computeUnits: number;
+  basePrice: number;
+  currentPrice: number;
+  scarcity: number;
+  demandLevel: number;
+  surgeActive: boolean;
+  savingsPercent: number;
+  surgePercent: number;
+}
+
+export interface ProviderPricing {
+  name: string;
+  pricingStyle: string;
+  gpuPrices: Record<string, number>;
+  totalRevenue: number;
+  resourcesSold: number;
+}
+
+export interface GPUBiddingGameState {
+  totalRounds: number;
+  currentRound: number;
+  userBudget: number;
+  userComputeAcquired: number;
+  userCostEfficiency: number;
+  neocloudRevenue: number;
+  neocloudResourcesSold: number;
+  gpuResources: GPUResource[];
+  providers: ProviderPricing[];
+  marketDemand: number;
+  currentGpu: GPUResource | null;
+  demandHistory: number[];
+  roundResults: unknown[];
 }
 
 export interface Prediction {
@@ -80,6 +116,7 @@ export interface MatchState {
   gameState: GameState;
   negotiationState?: NegotiationGameState;
   auctionState?: AuctionGameState;
+  gpuBiddingState?: GPUBiddingGameState;
   phase: MatchPhase;
   redPredictions: Prediction[];
   bluePredictions: Prediction[];

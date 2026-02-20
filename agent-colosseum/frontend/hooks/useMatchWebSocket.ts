@@ -10,6 +10,7 @@ import type {
   GameType,
   NegotiationGameState,
   AuctionGameState,
+  GPUBiddingGameState,
   WSEvent,
 } from '@/lib/types';
 
@@ -118,6 +119,9 @@ export function useMatchWebSocket(matchId: string | null) {
         if (event.auctionState) {
           updates.auctionState = event.auctionState as AuctionGameState;
         }
+        if (event.gpuBiddingState) {
+          updates.gpuBiddingState = event.gpuBiddingState as GPUBiddingGameState;
+        }
         setMatchState((prev) => ({ ...prev, ...updates }));
         break;
       }
@@ -179,6 +183,9 @@ export function useMatchWebSocket(matchId: string | null) {
         }
         if (event.auctionState) {
           endUpdates.auctionState = event.auctionState as AuctionGameState;
+        }
+        if (event.gpuBiddingState) {
+          endUpdates.gpuBiddingState = event.gpuBiddingState as GPUBiddingGameState;
         }
         setMatchState((prev) => ({
           ...prev,

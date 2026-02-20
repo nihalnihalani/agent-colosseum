@@ -7,6 +7,7 @@ import { ScoreDisplay } from './ScoreDisplay';
 import { AICommentator } from './AICommentator';
 import { NegotiationView } from './NegotiationView';
 import { AuctionView } from './AuctionView';
+import { GPUBiddingView } from './GPUBiddingView';
 import { AudiencePoll } from './AudiencePoll';
 import type { MatchState } from '@/lib/types';
 import { Trophy, ArrowLeft, Activity, Radio, Cpu, Eye } from 'lucide-react';
@@ -165,6 +166,19 @@ function GameSpecificView({ matchState }: { matchState: MatchState }) {
     );
   }
 
+  if (matchState.gameType === 'gpu_bidding' && matchState.gpuBiddingState) {
+    return (
+      <GPUBiddingView
+        state={matchState.gpuBiddingState}
+        currentRound={matchState.currentRound}
+        totalRounds={matchState.totalRounds}
+        redMove={matchState.redMove}
+        blueMove={matchState.blueMove}
+        phase={matchState.phase}
+      />
+    );
+  }
+
   return null;
 }
 
@@ -272,7 +286,7 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
         {/* Center: Arena Action */}
         <div className="lg:col-span-6 flex flex-col gap-6 lg:h-full lg:overflow-y-auto no-scrollbar">
           <ScoreDisplay
-            scores={matchState.gameState.scores}
+            scores={matchState.gameState?.scores ?? matchState.gpuBiddingState?.scores ?? { red: 0, blue: 0 }}
             accuracy={matchState.accuracy}
             currentRound={matchState.currentRound}
             totalRounds={matchState.totalRounds}

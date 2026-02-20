@@ -106,11 +106,11 @@ _matches: OrderedDict[str, dict[str, Any]] = OrderedDict()
 # REST endpoints
 # ---------------------------------------------------------------------------
 
-VALID_GAME_TYPES = ("resource_wars", "negotiation", "auction")
+VALID_GAME_TYPES = ("resource_wars", "negotiation", "auction", "gpu_bidding")
 
 
 class CreateMatchRequest(BaseModel):
-    game_type: Literal["resource_wars", "negotiation", "auction"] = "resource_wars"
+    game_type: Literal["resource_wars", "negotiation", "auction", "gpu_bidding"] = "resource_wars"
     red_personality: str = "aggressive"
     blue_personality: str = "defensive"
     rounds: int = Field(default=10, ge=1, le=50)
@@ -204,6 +204,12 @@ async def game_types():
                 "name": "The Auction",
                 "description": "8-item sealed-bid auction. Each agent starts with 1000 credits and hidden valuations. Highest bid wins.",
                 "defaultRounds": 8,
+            },
+            {
+                "id": "gpu_bidding",
+                "name": "GPU Marketplace",
+                "description": "Neocloud GPU resource bidding. User optimizes for cost, Neocloud optimizes for revenue. Dynamic surge pricing based on demand.",
+                "defaultRounds": 10,
             },
         ]
     }

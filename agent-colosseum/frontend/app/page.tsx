@@ -57,6 +57,14 @@ const gameTypes = [
     icon: <Gavel className="h-4 w-4 text-neutral-500" />,
     defaultRounds: 8,
   },
+  {
+    id: 'gpu_bidding',
+    title: 'GPU Marketplace',
+    description: 'Neocloud GPU bidding. User optimizes for cost, Neocloud maximizes revenue. Dynamic surge pricing.',
+    header: <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-emerald-900 to-teal-800" />,
+    icon: <Cpu className="h-4 w-4 text-neutral-500" />,
+    defaultRounds: 10,
+  },
 ];
 
 export default function Home() {
