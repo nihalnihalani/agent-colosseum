@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { Brain, Target, Loader2 } from 'lucide-react';
@@ -7,6 +8,8 @@ import type { Prediction, AgentConfig, MatchPhase } from '@/lib/types';
 import { PredictionCards } from './PredictionCards';
 import { BorderBeam } from '@/components/ui/BorderBeam'; // New import
 import { clsx } from 'clsx';
+
+type ArenaHighlightDetail = { agent: "red" | "blue"; index: number };
 
 interface AgentPanelProps {
   agent: 'red' | 'blue';
@@ -57,6 +60,21 @@ export function AgentPanel({
   phase,
   accuracy,
 }: AgentPanelProps) {
+  // Listen for arena:highlight events dispatched by the AI commentator agent
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { agent: targetAgent, index } = (e as CustomEvent<ArenaHighlightDetail>).detail;
+      if (targetAgent === agent) {
+        setHighlightedIndex(index);
+        setTimeout(() => setHighlightedIndex(null), 2500);
+      }
+    };
+    window.addEventListener("arena:highlight", handler);
+    return () => window.removeEventListener("arena:highlight", handler);
+  }, [agent]);
+
   const isRed = agent === 'red';
   const isThinking = phase === 'thinking';
   
@@ -145,6 +163,7 @@ export function AgentPanel({
                 predictions={predictions}
                 agentColor={agent}
                 phase={phase}
+                highlightedIndex={highlightedIndex}
               />
             )}
           </div>

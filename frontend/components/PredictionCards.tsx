@@ -9,12 +9,14 @@ interface PredictionCardsProps {
   predictions: Prediction[];
   agentColor: 'red' | 'blue';
   phase: MatchPhase;
+  highlightedIndex?: number | null;
 }
 
 export function PredictionCards({
   predictions,
   agentColor,
   phase,
+  highlightedIndex,
 }: PredictionCardsProps) {
   const isRevealed = phase === 'revealed' || phase === 'round_end' || phase === 'match_end';
   
@@ -57,7 +59,8 @@ export function PredictionCards({
               className={clsx(
                 "p-3 rounded-lg border transition-all duration-300 relative overflow-hidden group",
                 borderColor,
-                bgColor
+                bgColor,
+                highlightedIndex === i && "ring-2 ring-amber-400/60 shadow-[0_0_16px_rgba(251,191,36,0.3)] transition-shadow"
               )}
               initial={{ opacity: 0, x: agentColor === 'red' ? -20 : 20 }}
               animate={{
