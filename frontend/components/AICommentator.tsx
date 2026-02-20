@@ -1,12 +1,14 @@
 'use client';
 
-import { useCopilotReadable, useCopilotAction, useCoAgent, useCoAgentStateRender } from '@copilotkit/react-core';
+import { useCopilotReadable, useCopilotAction, useCoAgentStateRender, useLangGraphInterrupt, useFrontendTool } from '@copilotkit/react-core';
 import { CopilotChat } from '@copilotkit/react-ui';
 import type { MatchState } from '@/lib/types';
 import { StrategyInsightCard, type CommentatorState } from './StrategyInsightCard';
+import { dispatchHighlight, dispatchSfx, dispatchAnnounce, SFX_TONES } from '@/lib/arenaEffects';
 
 interface AICommentatorProps {
   matchState: MatchState;
+  commentatorState: CommentatorState;
 }
 
 const defaultState: CommentatorState = {
@@ -21,17 +23,11 @@ const defaultState: CommentatorState = {
   matchProgress: { round: 0, totalRounds: 10, phase: 'lobby' },
 };
 
-export function AICommentator({ matchState }: AICommentatorProps) {
+export function AICommentator({ matchState, commentatorState }: AICommentatorProps) {
   // 1. Provide match state as readable context
   useCopilotReadable({
     description: "Current match state in Agent Colosseum arena",
     value: matchState,
-  });
-
-  // 2. Bidirectional state sync with commentator agent
-  const { state: commentatorState } = useCoAgent<CommentatorState>({
-    name: "arena-commentator",
-    initialState: defaultState,
   });
 
   // 3. Render agent state in chat as custom UI
@@ -79,6 +75,77 @@ export function AICommentator({ matchState }: AICommentatorProps) {
     ],
     handler: async ({ title, content }) => {
       return `Insight: ${title} - ${content}`;
+    },
+  });
+
+  // 6. Human-in-the-loop: audience tiebreaker decision
+  useLangGraphInterrupt<string>({
+    render: ({ event, resolve }) => (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="max-w-sm w-full mx-4 p-6 rounded-2xl border border-white/10 bg-[#0a0a0f] space-y-4 shadow-2xl">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">Audience Decision</span>
+          </div>
+          <p className="text-sm text-zinc-300 leading-relaxed">{event.value}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => resolve("chaos")}
+              className="py-2.5 px-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm font-medium hover:bg-rose-500/20 transition-colors"
+            >
+              CHAOS MODE
+            </button>
+            <button
+              onClick={() => resolve("precision")}
+              className="py-2.5 px-4 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/20 transition-colors"
+            >
+              PRECISION MODE
+            </button>
+          </div>
+        </div>
+      </div>
+    ),
+  });
+
+  // 7. Frontend tool: highlight a prediction card
+  useFrontendTool({
+    name: "highlight_prediction",
+    description: "Highlight a specific prediction card in the agent visualization panel",
+    parameters: [
+      { name: "agent", type: "string" as const, description: "red or blue" },
+      { name: "index", type: "number" as const, description: "Prediction index (0-based)" },
+    ],
+    handler: async ({ agent, index }: { agent: string; index: number }) => {
+      dispatchHighlight({ agent: agent as "red" | "blue", index });
+      return { status: "highlighted", agent, index };
+    },
+  });
+
+  // 8. Frontend tool: play a sound effect
+  useFrontendTool({
+    name: "play_sfx",
+    description: "Play a sound effect in the browser for dramatic moments",
+    parameters: [
+      { name: "sound", type: "string" as const, description: "fanfare, clash, suspense, or victory" },
+    ],
+    handler: async ({ sound }: { sound: string }) => {
+      dispatchSfx({ sound: sound as "fanfare" | "clash" | "suspense" | "victory" });
+      const sfxFn = SFX_TONES[sound as keyof typeof SFX_TONES];
+      if (sfxFn) sfxFn();
+      return { status: "played", sound };
+    },
+  });
+
+  // 9. Frontend tool: full-screen announcement
+  useFrontendTool({
+    name: "announce_insight",
+    description: "Display a prominent announcement in the arena",
+    parameters: [
+      { name: "message", type: "string" as const, description: "Short announcement text" },
+    ],
+    handler: async ({ message }: { message: string }) => {
+      dispatchAnnounce({ message });
+      return { status: "announced" };
     },
   });
 
