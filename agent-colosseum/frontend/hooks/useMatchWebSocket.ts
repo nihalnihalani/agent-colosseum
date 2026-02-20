@@ -465,7 +465,7 @@ export function useMatchWebSocket(matchId: string | null) {
     if (!matchId || isMock) return;
 
     // Derive WS URL from API URL if NEXT_PUBLIC_WS_URL is not set
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8888';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const defaultWsHost = apiUrl.replace(/^http/, 'ws');
     const wsHost = process.env.NEXT_PUBLIC_WS_URL || defaultWsHost;
     const wsUrl = `${wsHost}/ws/match/${matchId}`;

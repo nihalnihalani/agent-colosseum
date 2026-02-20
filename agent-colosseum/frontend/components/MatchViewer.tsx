@@ -152,6 +152,79 @@ function MatchEndOverlay({ matchState }: { matchState: MatchState }) {
   );
 }
 
+function ResourceWarsView({ matchState }: { matchState: MatchState }) {
+  const resources = matchState.gameState?.resources ?? { A: 100, B: 100, C: 100 };
+  const resourceColors: Record<string, string> = {
+    A: 'from-rose-500 to-rose-400',
+    B: 'from-violet-500 to-violet-400',
+    C: 'from-cyan-500 to-cyan-400',
+  };
+  const resourceBorders: Record<string, string> = {
+    A: 'border-rose-500/30',
+    B: 'border-violet-500/30',
+    C: 'border-cyan-500/30',
+  };
+
+  return (
+    <div className="h-full flex flex-col gap-6 justify-center px-2">
+      {/* Resource bars */}
+      <div className="space-y-4">
+        <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Contested Resources</p>
+        {Object.entries(resources).map(([key, value]) => (
+          <div key={key} className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-mono text-zinc-400">RESOURCE {key}</span>
+              <span className="text-xs font-mono text-zinc-300 tabular-nums">{value}</span>
+            </div>
+            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <motion.div
+                className={`h-full bg-gradient-to-r ${resourceColors[key] ?? 'from-zinc-500 to-zinc-400'} rounded-full`}
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, (value / 100) * 100)}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Current moves */}
+      {(matchState.redMove || matchState.blueMove) && (
+        <div className="grid grid-cols-2 gap-3">
+          {matchState.redMove && (
+            <div className={`p-3 rounded-lg bg-rose-500/10 border ${resourceBorders.A}`}>
+              <p className="text-[10px] font-mono text-rose-400 uppercase tracking-wider mb-1.5">Red Move</p>
+              <p className="text-sm font-mono text-white truncate">{matchState.redMove.type}</p>
+              {matchState.redMove.amount > 0 && (
+                <p className="text-xs text-zinc-500 mt-1 font-mono">{matchState.redMove.target} · {matchState.redMove.amount}</p>
+              )}
+            </div>
+          )}
+          {matchState.blueMove && (
+            <div className={`p-3 rounded-lg bg-blue-500/10 border ${resourceBorders.C}`}>
+              <p className="text-[10px] font-mono text-blue-400 uppercase tracking-wider mb-1.5">Blue Move</p>
+              <p className="text-sm font-mono text-white truncate">{matchState.blueMove.type}</p>
+              {matchState.blueMove.amount > 0 && (
+                <p className="text-xs text-zinc-500 mt-1 font-mono">{matchState.blueMove.target} · {matchState.blueMove.amount}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Phase status when no moves yet */}
+      {!matchState.redMove && !matchState.blueMove && (
+        <div className="flex items-center justify-center gap-2 py-4">
+          <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+          <span className="text-xs font-mono text-zinc-600">
+            {matchState.phase === 'thinking' ? 'Agents calculating moves...' : 'Waiting for round start...'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GameSpecificView({ matchState }: { matchState: MatchState }) {
   if (matchState.gameType === 'negotiation' && matchState.negotiationState) {
     return (
@@ -179,7 +252,7 @@ function GameSpecificView({ matchState }: { matchState: MatchState }) {
     );
   }
 
-  return null;
+  return <ResourceWarsView matchState={matchState} />;
 }
 
 export function MatchViewer({ matchState }: MatchViewerProps) {
@@ -270,10 +343,10 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
       </header>
 
       {/* Main Layout Grid */}
-      <div className="flex-1 overflow-hidden relative z-10 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-        
+      <div className="flex-1 relative z-10 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 overflow-y-auto">
+
         {/* Left: Agent Red */}
-        <div className="lg:col-span-3 lg:h-full min-h-[400px]">
+        <div className="lg:col-span-3 min-h-[400px]">
           <AgentPanel
             agent="red"
             personality={matchState.agents.red.personality}
@@ -284,7 +357,7 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
         </div>
 
         {/* Center: Arena Action */}
-        <div className="lg:col-span-6 flex flex-col gap-6 lg:h-full lg:overflow-y-auto no-scrollbar">
+        <div className="lg:col-span-6 flex flex-col gap-6">
           <ScoreDisplay
             scores={matchState.gameState.scores}
             accuracy={matchState.accuracy}
@@ -294,13 +367,13 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
             phase={matchState.phase}
           />
 
-          <div className="flex-1 min-h-[360px] glass-panel p-1 rounded-xl border border-white/5 relative overflow-hidden bg-gradient-to-b from-white/[0.02] to-transparent">
-             <div className="relative z-10 h-full p-6">
-               <GameSpecificView matchState={matchState} />
-             </div>
+          <div className="glass-panel rounded-xl border border-white/5 relative overflow-hidden bg-gradient-to-b from-white/[0.02] to-transparent">
+            <div className="relative z-10 p-6 min-h-[280px]">
+              <GameSpecificView matchState={matchState} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20 lg:pb-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <AICommentator matchState={matchState} />
              <AudiencePoll
                currentRound={matchState.currentRound}
@@ -311,7 +384,7 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
         </div>
 
         {/* Right: Agent Blue */}
-        <div className="lg:col-span-3 lg:h-full min-h-[400px]">
+        <div className="lg:col-span-3 min-h-[400px]">
            <AgentPanel
             agent="blue"
             personality={matchState.agents.blue.personality}
