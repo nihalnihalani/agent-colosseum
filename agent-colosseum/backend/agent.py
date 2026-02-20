@@ -868,11 +868,8 @@ class AgentPredictor:
         return None
 
     async def _fetch_intelligence_context(self, opponent_personality: str) -> dict:
-        """Fetch Neo4j patterns and self accuracy in parallel. Never raises."""
-        try:
-            neo4j_patterns = await self._get_neo4j_patterns(opponent_personality)
-        except Exception:
-            neo4j_patterns = []
+        """Fetch Neo4j patterns and self accuracy. Never raises."""
+        neo4j_patterns = await self._get_neo4j_patterns(opponent_personality)
         self_accuracy = self._get_self_accuracy()
         return {
             "counter_patterns": neo4j_patterns if isinstance(neo4j_patterns, list) else [],
@@ -892,7 +889,12 @@ class AgentPredictor:
         config = AGENT_PERSONALITIES.get(self.personality, AGENT_PERSONALITIES["adaptive"])
 
         intelligence_context = await self._fetch_intelligence_context(opponent_personality)
-        prompt = self._build_prompt(game_state, my_history, opponent_history, intelligence_context)
+        prompt = self._build_prompt(
+            game_state,
+            my_history=my_history,
+            opponent_history=opponent_history,
+            intelligence_context=intelligence_context,
+        )
 
         with _llmobs_prediction_span(self.agent_name, self.personality, game_state.to_dict()):
             try:
