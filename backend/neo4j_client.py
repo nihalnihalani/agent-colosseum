@@ -114,17 +114,20 @@ class Neo4jClient:
             return []
 
     async def get_bluff_detection(self, opponent_history: list[str]) -> list[dict]:
-        """Detect 3-move sequences that preceded a bluff."""
+        """Detect the most common 3-move sequences in opponent play."""
         try:
             async with self._driver.session() as session:
                 result = await session.run(
                     """
-                    MATCH (m:Match)-[:HAS_ROUND]->(r1:Round)-[:BLUE_MOVED]->(m1:Move)
-                    MATCH (m)-[:HAS_ROUND]->(r2:Round)-[:BLUE_MOVED]->(m2:Move)
-                    MATCH (m)-[:HAS_ROUND]->(r3:Round)-[:BLUE_MOVED]->(m3:Move {type: 'bluff'})
-                    WHERE r1.number = r3.number - 2
-                      AND r2.number = r3.number - 1
-                    RETURN m1.type + ' -> ' + m2.type + ' -> BLUFF' AS pattern,
+                    MATCH (m:Match)-[:HAS_ROUND]->(r1:Round)
+                    MATCH (m)-[:HAS_ROUND]->(r2:Round)
+                    MATCH (m)-[:HAS_ROUND]->(r3:Round)
+                    MATCH (r1)-[:BLUE_MOVED]->(m1:Move)
+                    MATCH (r2)-[:BLUE_MOVED]->(m2:Move)
+                    MATCH (r3)-[:BLUE_MOVED]->(m3:Move)
+                    WHERE r2.number = r1.number + 1
+                      AND r3.number = r2.number + 1
+                    RETURN m1.type + ' -> ' + m2.type + ' -> ' + m3.type AS pattern,
                            count(*) AS occurrences
                     ORDER BY occurrences DESC
                     LIMIT 5
@@ -193,7 +196,9 @@ class Neo4jClient:
                 result = await session.run(
                     """
                     MATCH (m:Match)-[:HAS_ROUND]->(r:Round)
-                    MATCH (r)-[:RED_MOVED|BLUE_MOVED]->(mv:Move)
+                    MATCH (r)-[rel:RED_MOVED|BLUE_MOVED]->(mv:Move)
+                    WHERE (type(rel) = 'RED_MOVED' AND $agent_id = 'red')
+                       OR (type(rel) = 'BLUE_MOVED' AND $agent_id = 'blue')
                     MATCH (p:Prediction {agent: $agent_id})-[:FOR_ROUND]->(r)
                     RETURN m.id AS match_id,
                            r.number AS round_number,
@@ -303,17 +308,19 @@ class Neo4jClient:
         """Analyze negotiation offer patterns — how an agent's offers evolve."""
         try:
             async with self._driver.session() as session:
-                rel = "RED_MOVED" if agent_id == "red" else "BLUE_MOVED"
                 result = await session.run(
-                    f"""
-                    MATCH (m:Match {{game_type: 'negotiation'}})-[:HAS_ROUND]->(r:Round)
-                    MATCH (r)-[:{rel}]->(mv:Move)
+                    """
+                    MATCH (m:Match {game_type: 'negotiation'})-[:HAS_ROUND]->(r:Round)
+                    MATCH (r)-[rel:RED_MOVED|BLUE_MOVED]->(mv:Move)
+                    WHERE (type(rel) = 'RED_MOVED' AND $agent_id = 'red')
+                       OR (type(rel) = 'BLUE_MOVED' AND $agent_id = 'blue')
                     RETURN m.id AS match_id,
                            r.number AS round_number,
                            mv.type AS move_type,
                            mv.price AS price
                     ORDER BY m.id, r.number
                     """,
+                    agent_id=agent_id,
                 )
                 records = await result.data()
                 return records
@@ -365,11 +372,12 @@ class Neo4jClient:
         """Get bidding history for an agent across auction matches."""
         try:
             async with self._driver.session() as session:
-                rel = "RED_MOVED" if agent_id == "red" else "BLUE_MOVED"
                 result = await session.run(
-                    f"""
-                    MATCH (m:Match {{game_type: 'auction'}})-[:HAS_ROUND]->(r:Round)
-                    MATCH (r)-[:{rel}]->(mv:Move)
+                    """
+                    MATCH (m:Match {game_type: 'auction'})-[:HAS_ROUND]->(r:Round)
+                    MATCH (r)-[rel:RED_MOVED|BLUE_MOVED]->(mv:Move)
+                    WHERE (type(rel) = 'RED_MOVED' AND $agent_id = 'red')
+                       OR (type(rel) = 'BLUE_MOVED' AND $agent_id = 'blue')
                     RETURN m.id AS match_id,
                            r.number AS round_number,
                            r.item_name AS item,
@@ -377,6 +385,7 @@ class Neo4jClient:
                            mv.amount AS bid_amount
                     ORDER BY m.id, r.number
                     """,
+                    agent_id=agent_id,
                 )
                 records = await result.data()
                 return records
