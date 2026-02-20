@@ -78,11 +78,12 @@ def _llmobs_submit_evaluation(
         return
 
     try:
+        exported_span = _LLMObs.export_span()
         for i, pred in enumerate(predictions):
             predicted = pred.get("opponentMove", "")
             was_correct = predicted == actual_move
             _LLMObs.submit_evaluation(
-                span_context=None,
+                span_context=exported_span,
                 label=f"prediction_{i}_accuracy",
                 metric_type="score",
                 value=1.0 if was_correct else 0.0,
