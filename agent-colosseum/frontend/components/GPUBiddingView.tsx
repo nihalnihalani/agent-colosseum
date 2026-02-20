@@ -260,8 +260,28 @@ export function GPUBiddingView({
   blueMove,
   phase,
 }: GPUBiddingViewProps) {
+  // Add null safety for initial render before state is populated
+  if (!state) {
+    return (
+      <div className="w-full flex items-center justify-center py-12">
+        <div className="flex items-center gap-3 text-zinc-500">
+          <Cpu className="w-5 h-5 animate-pulse" />
+          <span>Initializing GPU Marketplace...</span>
+        </div>
+      </div>
+    );
+  }
+
   const currentGpu = state.currentGpu;
   const isThinking = phase === 'thinking';
+  const marketDemand = state.marketDemand ?? 0.5;
+  const userBudget = state.userBudget ?? 10000;
+  const userCompute = state.userComputeAcquired ?? 0;
+  const neocloudRevenue = state.neocloudRevenue ?? 0;
+  const resourcesSold = state.neocloudResourcesSold ?? 0;
+  const efficiency = state.userCostEfficiency ?? 0;
+  const gpuResources = state.gpuResources ?? [];
+  const providers = state.providers ?? [];
   
   return (
     <div className="w-full space-y-6">
@@ -278,17 +298,17 @@ export function GPUBiddingView({
         </div>
         
         <div className="flex items-center gap-4">
-          <DemandMeter demand={state.marketDemand} label="Market Demand" />
+          <DemandMeter demand={marketDemand} label="Market Demand" />
         </div>
       </div>
       
       {/* Stats Panel */}
       <StatsPanel
-        userBudget={state.userBudget}
-        userCompute={state.userComputeAcquired}
-        neocloudRevenue={state.neocloudRevenue}
-        resourcesSold={state.neocloudResourcesSold}
-        efficiency={state.userCostEfficiency}
+        userBudget={userBudget}
+        userCompute={userCompute}
+        neocloudRevenue={neocloudRevenue}
+        resourcesSold={resourcesSold}
+        efficiency={efficiency}
       />
       
       {/* Current GPU Being Bid On */}
@@ -303,9 +323,9 @@ export function GPUBiddingView({
       )}
       
       {/* Provider Comparison */}
-      {currentGpu && state.providers.length > 0 && (
+      {currentGpu && providers.length > 0 && (
         <ProviderComparisonTable 
-          providers={state.providers} 
+          providers={providers} 
           currentGpuName={currentGpu.name} 
         />
       )}

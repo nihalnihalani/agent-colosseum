@@ -506,6 +506,14 @@ class Match:
             actual_str = f"{actual_opponent_move.type.value}_{actual_opponent_move.price}"
         elif gt == "auction":
             actual_str = f"{actual_opponent_move.type.value}_{actual_opponent_move.amount}"
+        elif gt == "gpu_bidding":
+            # For GPU bidding, the move format depends on the agent type
+            if hasattr(actual_opponent_move, 'amount'):
+                # User move (GPUBidMove)
+                actual_str = f"{actual_opponent_move.type.value}_{actual_opponent_move.amount}"
+            else:
+                # Neocloud move (NeocloudMove)
+                actual_str = f"{actual_opponent_move.type.value}_{actual_opponent_move.price_adjustment}"
         else:
             actual_str = f"{actual_opponent_move.type.value}_{actual_opponent_move.target.value}"
         annotated = []

@@ -80,13 +80,11 @@ export function useMatchWebSocket(matchId: string | null) {
   const [matchState, setMatchState] = useState<MatchState>(initialMatchState);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reconnectKey, setReconnectKey] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const mockTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttempts = useRef(0);
   const pendingConfigRef = useRef<MatchConfig | null>(null);
+  const handleEventRef = useRef<((event: WSEvent) => void) | null>(null);
   const isMock = process.env.NEXT_PUBLIC_MOCK_WS === 'true';
-  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const handleEvent = useCallback((event: WSEvent) => {
     switch (event.type) {
@@ -213,6 +211,9 @@ export function useMatchWebSocket(matchId: string | null) {
         break;
     }
   }, []);
+
+  // Keep the ref updated with latest handleEvent
+  handleEventRef.current = handleEvent;
 
   // Mock simulation
   const runMockMatch = useCallback(
@@ -479,11 +480,10 @@ export function useMatchWebSocket(matchId: string | null) {
     ws.onopen = () => {
       setIsConnected(true);
       setError(null);
-      reconnectAttempts.current = 0;
       // Drain any pending start_match that was queued before the connection opened
       if (pendingConfigRef.current) {
         const cfg = pendingConfigRef.current;
-        pendingConfigRef.current = null;  // null BEFORE send to avoid double-send on throw
+        pendingConfigRef.current = null;
         ws.send(JSON.stringify({
           type: 'start_match',
           gameType: cfg.gameType,
@@ -497,7 +497,7 @@ export function useMatchWebSocket(matchId: string | null) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as WSEvent;
-        handleEvent(data);
+        handleEventRef.current?.(data);
       } catch {
         console.error('Failed to parse WebSocket message');
       }
@@ -509,24 +509,14 @@ export function useMatchWebSocket(matchId: string | null) {
 
     ws.onclose = () => {
       setIsConnected(false);
-      if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-        reconnectAttempts.current += 1;
-        setError(`Disconnected. Reconnecting in ${Math.round(delay / 1000)}s...`);
-        setTimeout(() => {
-          setError(null);
-          setReconnectKey(k => k + 1);
-        }, delay);
-      } else {
-        setError('Connection lost. Please refresh the page.');
-      }
+      // Don't auto-reconnect - user needs to refresh to get a new match
     };
 
     return () => {
       ws.close();
       wsRef.current = null;
     };
-  }, [matchId, isMock, handleEvent, reconnectKey]);
+  }, [matchId, isMock]);
 
   const startMatch = useCallback(
     (config: MatchConfig) => {

@@ -70,6 +70,7 @@ function ConfettiCelebration({ winner }: { winner: string }) {
 function MatchEndOverlay({ matchState }: { matchState: MatchState }) {
   const isRed = matchState.winner === 'red';
   const router = useRouter();
+  const scores = matchState.gameState?.scores ?? matchState.gpuBiddingState?.scores ?? { red: 0, blue: 0 };
 
   return (
     <motion.div
@@ -104,7 +105,7 @@ function MatchEndOverlay({ matchState }: { matchState: MatchState }) {
           <div className="grid grid-cols-3 gap-8 py-8 border-y border-white/5">
             <div className="text-center">
               <p className="text-3xl font-mono font-bold text-white mb-1">
-                {matchState.gameState.scores.red}
+                {scores.red}
               </p>
               <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Red Score</p>
             </div>
@@ -113,7 +114,7 @@ function MatchEndOverlay({ matchState }: { matchState: MatchState }) {
             </div>
             <div className="text-center">
               <p className="text-3xl font-mono font-bold text-white mb-1">
-                {matchState.gameState.scores.blue}
+                {scores.blue}
               </p>
               <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Blue Score</p>
             </div>
@@ -199,10 +200,11 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
       } else if (blueCorrect > redCorrect) {
         setLastRoundWinner('blue');
       } else {
-        setLastRoundWinner(matchState.gameState.scores.red >= matchState.gameState.scores.blue ? 'red' : 'blue');
+        const scores = matchState.gameState?.scores ?? matchState.gpuBiddingState?.scores ?? { red: 0, blue: 0 };
+        setLastRoundWinner(scores.red >= scores.blue ? 'red' : 'blue');
       }
     }
-  }, [matchState.phase, matchState.currentRound, matchState.redPredictions, matchState.bluePredictions, matchState.gameState.scores]);
+  }, [matchState.phase, matchState.currentRound, matchState.redPredictions, matchState.bluePredictions, matchState.gameState?.scores, matchState.gpuBiddingState?.scores]);
 
   const gameTypeLabel = matchState.gameType.replace('_', ' ');
 
