@@ -79,11 +79,11 @@ class Neo4jClient:
                     blue_target=round_data["blue_move"].get("target", ""),
                     blue_amount=round_data["blue_move"].get("amount", 0),
                     predictions=[
-                        {**p, "agent": "red", "id": f"{match_id}_r{round_data['round']}_red_pred_{i}"}
+                        {**p, "agent": "red", "id": f"{match_id}_round_{round_data['round']}_red_pred_{i}"}
                         for i, p in enumerate(round_data.get("red_predictions", []))
                     ]
                     + [
-                        {**p, "agent": "blue", "id": f"{match_id}_r{round_data['round']}_blue_pred_{i}"}
+                        {**p, "agent": "blue", "id": f"{match_id}_round_{round_data['round']}_blue_pred_{i}"}
                         for i, p in enumerate(round_data.get("blue_predictions", []))
                     ],
                 )
