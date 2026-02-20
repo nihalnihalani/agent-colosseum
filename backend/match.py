@@ -292,20 +292,22 @@ class Match:
         # Red predicted blue's move; blue predicted red's move.
         gt = self.config.game_type
         if gt == "negotiation":
-            blue_actual_str = f"{blue_move.type.value}_{blue_move.price}"
-            red_actual_str = f"{red_move.type.value}_{red_move.price}"
+            actual_blue_move_str = f"{blue_move.type.value}_{blue_move.price}"
+            actual_red_move_str = f"{red_move.type.value}_{red_move.price}"
         elif gt == "auction":
-            blue_actual_str = f"{blue_move.type.value}_{blue_move.amount}"
-            red_actual_str = f"{red_move.type.value}_{red_move.amount}"
+            actual_blue_move_str = f"{blue_move.type.value}_{blue_move.amount}"
+            actual_red_move_str = f"{red_move.type.value}_{red_move.amount}"
         else:
-            blue_actual_str = f"{blue_move.type.value}_{blue_move.target.value}"
-            red_actual_str = f"{red_move.type.value}_{red_move.target.value}"
+            actual_blue_move_str = f"{blue_move.type.value}_{blue_move.target.value}"
+            actual_red_move_str = f"{red_move.type.value}_{red_move.target.value}"
 
+        # red predicted blue's move → score against actual_blue_move_str
         _llmobs_submit_evaluation(
-            "red", red_result.predictions, blue_actual_str, red_result.llmobs_span
+            "red", red_result.predictions, actual_blue_move_str, red_result.llmobs_span
         )
+        # blue predicted red's move → score against actual_red_move_str
         _llmobs_submit_evaluation(
-            "blue", blue_result.predictions, red_actual_str, blue_result.llmobs_span
+            "blue", blue_result.predictions, actual_red_move_str, blue_result.llmobs_span
         )
 
         # --- collapse event ---
@@ -356,7 +358,6 @@ class Match:
         # --- Neo4j storage ---
         if self._neo4j_client:
             try:
-                gt = self.config.game_type
                 if gt == "negotiation":
                     await self._neo4j_client.store_negotiation_round(
                         match_id=self.config.match_id,
