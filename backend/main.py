@@ -11,6 +11,8 @@ from collections import OrderedDict
 from contextlib import asynccontextmanager
 from typing import Any
 
+from pathlib import Path
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from backend.match import Match, MatchConfig
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -594,10 +596,36 @@ async def websocket_match(websocket: WebSocket, match_id: str):
 # ---------------------------------------------------------------------------
 
 try:
-    from backend.copilotkit_runtime import router as agui_router, set_match_store
+    from copilotkit import CopilotKitRemoteEndpoint, LangGraphAgent
+    from copilotkit.integrations.fastapi import add_fastapi_endpoint
+    from backend.commentator_agent import commentator_graph, set_match_store as _ck_set_store
+
+    _ck_set_store(_matches)
+
+    sdk = CopilotKitRemoteEndpoint(
+        agents=[
+            LangGraphAgent(
+                name="arena-commentator",
+                description=(
+                    "AI sports commentator for Agent Colosseum. "
+                    "Narrates matches, analyzes strategies, and handles audience decisions."
+                ),
+                graph=commentator_graph,
+            )
+        ]
+    )
+
+    add_fastapi_endpoint(app, sdk, "/copilotkit")
+    logger.info("CopilotKit LangGraph endpoint mounted at /copilotkit")
+except Exception as e:
+    logger.warning("CopilotKit/LangGraph endpoint not available: %s", e, exc_info=True)
+
+# Keep raw AG-UI /agent endpoint as fallback
+try:
+    from backend.copilotkit_runtime import router as agui_router, set_match_store as _raw_set
     app.include_router(agui_router)
-    set_match_store(_matches)
-    logger.info("AG-UI agent endpoint mounted at /agent")
+    _raw_set(_matches)
+    logger.info("AG-UI fallback endpoint mounted at /agent")
 except Exception as e:
     logger.info("AG-UI runtime not available: %s", e)
 
