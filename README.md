@@ -1,66 +1,105 @@
+<div align="center">
+
 # Agent Colosseum
 
 ### A live, spectatable arena where AI agents compete in adversarial games — and the audience watches both agents imagine each other's futures in real-time.
 
-<p align="center">
-  <img src="frontend/public/resource-wars.png" alt="Resource Wars" width="30%" />
-  <img src="frontend/public/negotiation.png" alt="Negotiation" width="30%" />
-  <img src="frontend/public/auction.png" alt="Auction" width="30%" />
-</p>
+<br />
+
+[![Built for AWS Hackathon](https://img.shields.io/badge/Built_for-AWS_Hackathon_2025-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](https://awshackathon.com)
+[![Powered by Amazon Bedrock](https://img.shields.io/badge/Powered_by-Amazon_Bedrock-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=FF9900)](https://aws.amazon.com/bedrock/)
+
+<br />
+
+<img src="frontend/public/resource-wars.png" alt="Resource Wars" width="30%" />
+<img src="frontend/public/negotiation.png" alt="Negotiation" width="30%" />
+<img src="frontend/public/auction.png" alt="Auction" width="30%" />
+
+<br /><br />
+
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white)
+![Framer Motion](https://img.shields.io/badge/Framer_Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Amazon Bedrock](https://img.shields.io/badge/Amazon_Bedrock-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)
+![CopilotKit](https://img.shields.io/badge/CopilotKit-6366F1?style=for-the-badge&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)
+![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=for-the-badge&logo=neo4j&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Datadog](https://img.shields.io/badge/Datadog-632CA6?style=for-the-badge&logo=datadog&logoColor=white)
+![WebSocket](https://img.shields.io/badge/WebSocket-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
+
+</div>
 
 ---
 
-## What is Agent Colosseum?
+## About This Project
 
-**Agent Colosseum** puts two AI agents in a head-to-head adversarial arena. Each agent uses a foundation model (Claude on Amazon Bedrock) to predict the opponent's next move, producing branching "imagination trees" that render in real-time as animated 3D force graphs. The audience watches both agents think, strategize, and outmaneuver each other across three distinct game protocols.
+> **AWS Hackathon 2025 Submission** — Agent Colosseum demonstrates how Amazon Bedrock, CopilotKit, Datadog LLM Observability, and Neo4j can be combined into a single production-grade application for evaluating AI agent reasoning under adversarial pressure.
 
-Every prediction, strategy shift, and outcome is tracked through **Datadog LLM Observability**, queried through **Neo4j strategy graphs**, and archived in **MongoDB** — making Agent Colosseum both a spectacle and a full observability reference architecture.
+**Agent Colosseum** puts two AI agents in a head-to-head adversarial arena. Each agent uses **Claude on Amazon Bedrock** to predict the opponent's next move, producing branching "imagination trees" that render in real-time as animated 3D force graphs. The audience watches both agents think, strategize, and outmaneuver each other across three distinct game protocols.
+
+Every prediction, strategy shift, and outcome is tracked through **Datadog LLM Observability**, queried through **Neo4j strategy graphs**, and archived in **MongoDB** — making Agent Colosseum both a spectacle and a full observability reference architecture for LLM-powered applications.
+
+---
+
+## Hackathon Tracks
+
+| Track | Integration |
+|---|---|
+| **Amazon Bedrock** | Claude Sonnet powers all agent predictions — opponent modeling, strategy selection, and confidence scoring via streaming Bedrock inference |
+| **CopilotKit** | AG-UI protocol drives the AI Commentator — live match analysis, strategy insight cards, sound effects, and human-in-the-loop tiebreaker decisions via LangGraph |
+| **Datadog** | Full LLM Observability — every Bedrock call is traced end-to-end with deferred prediction accuracy evaluations, confidence calibration metrics, and token economics via DogStatsD |
 
 ---
 
 ## Features
 
-| | Feature | Description |
-|---|---|---|
-| **3 Game Protocols** | Resource Wars, Negotiation, Auction | Three distinct adversarial formats, each with unique mechanics, scoring, and bluff dynamics |
-| **Imagination Trees** | 3D Force Graph | Real-time visualization of each agent's prediction branches using Three.js — watch confidence scores, counter-strategies, and branch accuracy unfold live |
-| **Agent Personalities** | 4 Archetypes | Aggressive, Defensive, Adaptive, Chaotic — each with tuned risk tolerance, bluff frequency, and move weight distributions |
-| **AI Commentator** | CopilotKit + LangGraph | Live match commentary via AG-UI protocol with strategy insight cards, sound effects, and human-in-the-loop tiebreaker decisions |
-| **Strategy Intelligence** | Neo4j Graph | Historical strategy patterns, win matrices, bluff detection sequences, and counter-strategy paths — injected into agent prompts for adaptive play |
-| **Match Archive** | MongoDB | Full match replays with round-by-round detail, agent performance stats, and leaderboard rankings |
-| **LLM Observability** | Datadog | Prediction accuracy, confidence calibration, token economics, round latency, and strategy drift — all instrumented end-to-end |
-| **Mock Mode** | Zero Dependencies | Run the full experience locally without API keys, databases, or cloud services |
+| Feature | Description |
+|---|---|
+| **3 Game Protocols** | Resource Wars (10-round capture), Negotiation (5-round offers), Auction (8-item sealed bids) — each with unique mechanics, scoring, and bluff dynamics |
+| **Imagination Trees** | Real-time 3D visualization of each agent's prediction branches using Three.js — watch confidence scores, counter-strategies, and branch accuracy unfold live |
+| **4 Agent Personalities** | Aggressive, Defensive, Adaptive, Chaotic — each with tuned risk tolerance, bluff frequency, and move weight distributions |
+| **AI Commentator** | CopilotKit + LangGraph-powered live match commentary with strategy insight cards, sound effects, and human-in-the-loop tiebreaker decisions via AG-UI protocol |
+| **Strategy Intelligence** | Neo4j stores historical strategy patterns, win matrices, bluff detection sequences, and counter-strategy paths — injected into agent prompts for adaptive play |
+| **Match Archive & Replay** | MongoDB persists full match replays with round-by-round detail, agent performance stats, and personality leaderboard rankings |
+| **LLM Observability** | Datadog tracks prediction accuracy, confidence calibration, token economics, round latency, and strategy drift — all instrumented end-to-end |
+| **Mock Mode** | Run the full experience locally with zero API keys, databases, or cloud services — weighted heuristic agents simulate realistic game dynamics |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Frontend (Next.js 16 / React 19)                           │
-│  ┌────────────┐  ┌────────────────┐  ┌───────────────────┐  │
-│  │  Arena UI  │  │  Imagination   │  │  AI Commentator   │  │
-│  │            │  │  Tree (3D)     │  │  (CopilotKit)     │  │
-│  └─────┬──────┘  └────────────────┘  └────────┬──────────┘  │
-│        │ WebSocket                            │ AG-UI SSE   │
-└────────┼──────────────────────────────────────┼─────────────┘
-         │                                      │
-┌────────┼──────────────────────────────────────┼─────────────┐
-│  Backend (FastAPI / Python)                   │             │
-│  ┌─────┴──────┐  ┌────────────┐  ┌────────────┴──────────┐  │
-│  │  Match     │  │  Agent     │  │  CopilotKit Runtime   │  │
-│  │  Engine    │  │  Predictor │  │  + LangGraph Agent    │  │
-│  └─────┬──────┘  └─────┬──────┘  └───────────────────────┘  │
-│        │               │                                     │
-│  ┌─────┴──────┐  ┌─────┴──────┐  ┌───────────────────────┐  │
-│  │  Game      │  │  Amazon    │  │  Datadog LLM Obs      │  │
-│  │  Engines   │  │  Bedrock   │  │  + DogStatsD          │  │
-│  └────────────┘  └────────────┘  └───────────────────────┘  │
-│                                                              │
-│  ┌────────────────┐  ┌────────────────┐                      │
-│  │  Neo4j         │  │  MongoDB       │                      │
-│  │  (Strategy)    │  │  (Archive)     │                      │
-│  └────────────────┘  └────────────────┘                      │
+┌──────────────────────────────────────────────────────────────┐
+│  Frontend (Next.js 16 / React 19)                            │
+│  ┌────────────┐  ┌─────────────────┐  ┌────────────────────┐ │
+│  │  Arena UI  │  │  Imagination    │  │  AI Commentator    │ │
+│  │            │  │  Tree (Three.js)│  │  (CopilotKit)      │ │
+│  └──────┬─────┘  └─────────────────┘  └─────────┬──────────┘ │
+│         │ WebSocket                             │ AG-UI SSE  │
+└─────────┼───────────────────────────────────────┼────────────┘
+          │                                       │
+┌─────────┼───────────────────────────────────────┼────────────┐
+│  Backend (FastAPI / Python)                     │            │
+│  ┌──────┴──────┐  ┌─────────────┐  ┌────────────┴─────────┐ │
+│  │  Match      │  │  Agent      │  │  CopilotKit Runtime  │ │
+│  │  Engine     │  │  Predictor  │  │  + LangGraph Agent   │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────────────────────┘ │
+│         │                │                                    │
+│  ┌──────┴──────┐  ┌──────┴──────┐  ┌──────────────────────┐ │
+│  │  Game       │  │  Amazon     │  │  Datadog LLM Obs     │ │
+│  │  Engines    │  │  Bedrock    │  │  + DogStatsD         │ │
+│  └─────────────┘  └─────────────┘  └──────────────────────┘ │
+│                                                               │
+│  ┌─────────────────┐  ┌─────────────────┐                    │
+│  │  Neo4j          │  │  MongoDB        │                    │
+│  │  (Strategy)     │  │  (Archive)      │                    │
+│  └─────────────────┘  └─────────────────┘                    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -68,14 +107,55 @@ Every prediction, strategy shift, and outcome is tracked through **Datadog LLM O
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16, React 19, Tailwind CSS 4, Framer Motion 12 |
-| 3D Visualization | Three.js, 3d-force-graph, three-spritetext |
-| AI Copilot | CopilotKit 1.51, AG-UI Protocol, LangGraph |
-| Backend | Python, FastAPI, Uvicorn, WebSockets |
-| AI Engine | Amazon Bedrock (Claude Sonnet 4.5) |
-| Strategy Graph | Neo4j 5 (async driver) |
-| Match Archive | MongoDB (PyMongo) |
-| Observability | Datadog — ddtrace, DogStatsD, LLM Observability |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS 4, Framer Motion 12 |
+| **3D Visualization** | Three.js, 3d-force-graph, three-spritetext |
+| **AI Copilot** | CopilotKit 1.51, AG-UI Protocol, LangGraph |
+| **Backend** | Python 3.12+, FastAPI, Uvicorn, WebSockets |
+| **AI Engine** | Amazon Bedrock — Claude Sonnet 4.5 |
+| **Strategy Graph** | Neo4j 5 (async driver) |
+| **Match Archive** | MongoDB (PyMongo) |
+| **Observability** | Datadog — ddtrace, DogStatsD, LLM Observability |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 18+
+
+### 1. Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Start the server (from the repo root)
+cd ..
+PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
+```
+
+> The backend uses package-style imports (`from backend.match import ...`), so Uvicorn must run from the repository root with `backend.main:app`.
+
+### 2. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 3. Open the Arena
+
+1. Go to `http://localhost:3000`
+2. Pick a game protocol (Resource Wars, Negotiation, or Auction)
+3. Configure agent personalities (e.g., Aggressive vs Defensive)
+4. Click **Initialize Simulation**
+5. Watch the match unfold with real-time prediction branches, scores, and AI commentary
+
+> Mock mode is enabled by default — no API keys, databases, or cloud services required.
 
 ---
 
@@ -119,8 +199,6 @@ Every prediction, strategy shift, and outcome is tracked through **Datadog LLM O
 
 ## Agent Personalities
 
-Each personality has distinct risk tolerance, temperature, bluff frequency, and move weight distributions:
-
 | Personality | Risk | Bluff % | Style |
 |---|---|---|---|
 | **Aggressive** | 0.8 | 30% | High-risk, high-reward. Bold moves and heavy bluffs. |
@@ -130,61 +208,20 @@ Each personality has distinct risk tolerance, temperature, bluff frequency, and 
 
 ---
 
-## Quick Start
-
-### Prerequisites
-
-- Python 3.12+
-- Node.js 18+
-
-### 1. Backend
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# Start the server (from the repo root)
-cd ..
-PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
-```
-
-> The backend uses package-style imports (`from backend.match import ...`), so Uvicorn must run from the repository root with `backend.main:app`.
-
-### 2. Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 3. Open the Arena
-
-1. Go to `http://localhost:3000`
-2. Pick a game protocol
-3. Configure agent personalities (e.g., Aggressive vs Defensive)
-4. Click **Initialize Simulation**
-5. Watch the match unfold with real-time prediction branches, scores, and AI commentary
-
-Mock mode is enabled by default — no API keys, databases, or cloud services required.
-
----
-
 ## How It Works
 
 ### Per-Round Data Flow
 
 ```
-1.  Match engine sends current game state to both agents
-2.  Agents call Bedrock (or mock) for opponent predictions — runs in parallel
-3.  Each agent produces 3 prediction branches with confidence scores
-4.  Predictions stream to the frontend via WebSocket
-5.  Frontend renders imagination trees in real-time (3D force graph)
-6.  Agents commit their chosen moves
-7.  Game engine resolves the round (capture / negotiation / bid mechanics)
-8.  Predictions annotated with wasCorrect / partialMatch
-9.  Results written to Neo4j (strategy graph) and MongoDB (archive)
+ 1. Match engine sends current game state to both agents
+ 2. Agents call Bedrock (or mock) for opponent predictions — runs in parallel
+ 3. Each agent produces 3 prediction branches with confidence scores
+ 4. Predictions stream to the frontend via WebSocket
+ 5. Frontend renders imagination trees in real-time (3D force graph)
+ 6. Agents commit their chosen moves
+ 7. Game engine resolves the round (capture / negotiation / bid mechanics)
+ 8. Predictions annotated with wasCorrect / partialMatch
+ 9. Results written to Neo4j (strategy graph) and MongoDB (archive)
 10. Datadog metrics emitted (prediction accuracy, latency, token usage)
 11. CopilotKit commentator analyzes state and streams live commentary
 12. Frontend updates scores, imagination tree colors, and insight cards
@@ -303,7 +340,7 @@ Events stream in order: `match_start` → `round_start` → `thinking_start` →
 
 ---
 
-## Observability
+## Observability (Datadog)
 
 When Datadog is configured, the platform emits:
 
@@ -372,9 +409,20 @@ As AI agents move from chat assistants to autonomous decision-makers, we need be
 - **Make AI decision-making visible** — The imagination tree shows *why* an agent chose a move, not just *what* it chose — critical for building trust in agentic systems.
 - **Benchmark personality strategies** — Run different configurations against each other (Aggressive vs Defensive, Chaotic vs Adaptive) to quantify which prompting strategies produce better game-theoretic outcomes.
 - **Full-stack LLM observability** — A reference architecture for instrumenting LLM-powered applications: prediction accuracy, confidence calibration, token economics, latency budgets, and strategy drift.
-- **Modern AI tooling showcase** — CopilotKit (AG-UI protocol), Amazon Bedrock, LangGraph, Neo4j, and Datadog LLM Observability integrated into a single cohesive application.
+- **Modern AI tooling showcase** — Amazon Bedrock, CopilotKit (AG-UI protocol), LangGraph, Neo4j, and Datadog LLM Observability integrated into a single cohesive application.
 
 ---
+
+<div align="center">
+
+**Built for the AWS Hackathon 2025**
+
+![Amazon Bedrock](https://img.shields.io/badge/Amazon_Bedrock-FF9900?style=flat-square&logo=amazonwebservices&logoColor=white)
+![CopilotKit](https://img.shields.io/badge/CopilotKit-6366F1?style=flat-square&logoColor=white)
+![Datadog](https://img.shields.io/badge/Datadog-632CA6?style=flat-square&logo=datadog&logoColor=white)
+![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white)
+
+</div>
 
 ## License
 
