@@ -6,8 +6,13 @@
 
 <br />
 
-[![Built for AWS Hackathon](https://img.shields.io/badge/Built_for-AWS_Hackathon_2025-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](https://awshackathon.com)
+[![AWS x Anthropic x Datadog GenAI Hackathon](https://img.shields.io/badge/AWS_x_Anthropic_x_Datadog-GenAI_Hackathon_2026-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](https://awshackathon.com)
+[![$35K+ in Prizes](https://img.shields.io/badge/$35K+-in_Prizes-00C853?style=for-the-badge&logoColor=white)]()
 [![Powered by Amazon Bedrock](https://img.shields.io/badge/Powered_by-Amazon_Bedrock-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=FF9900)](https://aws.amazon.com/bedrock/)
+[![Built with Anthropic Claude](https://img.shields.io/badge/Built_with-Anthropic_Claude-191919?style=for-the-badge&logo=anthropic&logoColor=white)](https://www.anthropic.com/)
+[![Monitored by Datadog](https://img.shields.io/badge/Monitored_by-Datadog-632CA6?style=for-the-badge&logo=datadog&logoColor=white)](https://www.datadoghq.com/)
+
+**February 20, 2026**
 
 <br />
 
@@ -39,7 +44,7 @@
 
 ## About This Project
 
-> **AWS Hackathon 2025 Submission** — Agent Colosseum demonstrates how Amazon Bedrock, CopilotKit, Datadog LLM Observability, and Neo4j can be combined into a single production-grade application for evaluating AI agent reasoning under adversarial pressure.
+> **AWS x Anthropic x Datadog GenAI Hackathon 2026 Submission** (Feb 20, 2026) — Agent Colosseum demonstrates how Amazon Bedrock, CopilotKit, Datadog LLM Observability, and Neo4j can be combined into a single production-grade application for evaluating AI agent reasoning under adversarial pressure.
 
 **Agent Colosseum** puts two AI agents in a head-to-head adversarial arena. Each agent uses **Claude on Amazon Bedrock** to predict the opponent's next move, producing branching "imagination trees" that render in real-time as animated 3D force graphs. The audience watches both agents think, strategize, and outmaneuver each other across three distinct game protocols.
 
@@ -51,9 +56,10 @@ Every prediction, strategy shift, and outcome is tracked through **Datadog LLM O
 
 | Track | Integration |
 |---|---|
-| **Amazon Bedrock** | Claude Sonnet powers all agent predictions — opponent modeling, strategy selection, and confidence scoring via streaming Bedrock inference |
-| **CopilotKit** | AG-UI protocol drives the AI Commentator — live match analysis, strategy insight cards, sound effects, and human-in-the-loop tiebreaker decisions via LangGraph |
+| **AWS / Amazon Bedrock** | Claude Sonnet on Bedrock powers all agent predictions — opponent modeling, strategy selection, and confidence scoring via streaming Bedrock inference |
+| **Anthropic Claude** | Claude Sonnet 4.5 is the foundation model driving all agent reasoning — structured JSON prediction prompts, personality-tuned temperature, and multi-branch opponent modeling |
 | **Datadog** | Full LLM Observability — every Bedrock call is traced end-to-end with deferred prediction accuracy evaluations, confidence calibration metrics, and token economics via DogStatsD |
+| **CopilotKit** | AG-UI protocol drives the AI Commentator — live match analysis, strategy insight cards, sound effects, and human-in-the-loop tiebreaker decisions via LangGraph |
 
 ---
 
@@ -415,11 +421,14 @@ As AI agents move from chat assistants to autonomous decision-makers, we need be
 
 <div align="center">
 
-**Built for the AWS Hackathon 2025**
+**Built for the AWS x Anthropic x Datadog GenAI Hackathon 2026 — $35K+ in Prizes**
+
+**February 20, 2026**
 
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon_Bedrock-FF9900?style=flat-square&logo=amazonwebservices&logoColor=white)
-![CopilotKit](https://img.shields.io/badge/CopilotKit-6366F1?style=flat-square&logoColor=white)
+![Anthropic Claude](https://img.shields.io/badge/Anthropic_Claude-191919?style=flat-square&logo=anthropic&logoColor=white)
 ![Datadog](https://img.shields.io/badge/Datadog-632CA6?style=flat-square&logo=datadog&logoColor=white)
+![CopilotKit](https://img.shields.io/badge/CopilotKit-6366F1?style=flat-square&logoColor=white)
 ![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white)
 
 </div>
