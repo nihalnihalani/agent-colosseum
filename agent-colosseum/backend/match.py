@@ -76,12 +76,7 @@ class Match:
                 )
             else:
                 self.game_state = GameState(total_rounds=self.config.total_rounds)
-        if self.red_agent is None:
-            self.red_agent = AgentPredictor("red", self.config.red_personality, game_type=gt)
-        if self.blue_agent is None:
-            self.blue_agent = AgentPredictor("blue", self.config.blue_personality, game_type=gt)
-
-        # Lazy-load optional integrations
+        # Lazy-load optional integrations first (agents need these)
         try:
             from backend.neo4j_client import get_neo4j_client
             self._neo4j_client = get_neo4j_client()
@@ -100,112 +95,139 @@ class Match:
         except Exception:
             pass
 
+        if self.red_agent is None:
+            self.red_agent = AgentPredictor(
+                "red", self.config.red_personality, game_type=gt,
+                neo4j_client=self._neo4j_client, metrics=self._metrics,
+            )
+        if self.blue_agent is None:
+            self.blue_agent = AgentPredictor(
+                "blue", self.config.blue_personality, game_type=gt,
+                neo4j_client=self._neo4j_client, metrics=self._metrics,
+            )
+
     async def run_match(self) -> AsyncGenerator[dict, None]:
         """Run the complete match, yielding WebSocket-ready event dicts."""
+        _match_completed = False
+        try:
+            # --- match_start ---
+            match_start_event = {
+                "type": "match_start",
+                "matchId": self.config.match_id,
+                "gameType": self.config.game_type,
+                "agents": {
+                    "red": {"personality": self.config.red_personality},
+                    "blue": {"personality": self.config.blue_personality},
+                },
+                "totalRounds": self.config.total_rounds,
+            }
 
-        # --- match_start ---
-        match_start_event = {
-            "type": "match_start",
-            "matchId": self.config.match_id,
-            "gameType": self.config.game_type,
-            "agents": {
-                "red": {"personality": self.config.red_personality},
-                "blue": {"personality": self.config.blue_personality},
-            },
-            "totalRounds": self.config.total_rounds,
-        }
+            # Initialize match document in MongoDB
+            if self._mongodb_client:
+                try:
+                    from datetime import datetime, timezone
+                    self._mongodb_client.store_match({
+                        "match_id": self.config.match_id,
+                        "game_type": self.config.game_type,
+                        "agents": {
+                            "red": {"personality": self.config.red_personality, "model": "mock"},
+                            "blue": {"personality": self.config.blue_personality, "model": "mock"},
+                        },
+                        "total_rounds": self.config.total_rounds,
+                        "started_at": datetime.now(timezone.utc).isoformat(),
+                        "state": "running",
+                        "rounds": [],
+                    })
+                except Exception as e:
+                    logger.warning("MongoDB match init failed: %s", e)
 
-        # Initialize match document in MongoDB
-        if self._mongodb_client:
-            try:
-                from datetime import datetime, timezone
-                self._mongodb_client.store_match({
-                    "match_id": self.config.match_id,
-                    "game_type": self.config.game_type,
-                    "agents": {
-                        "red": {"personality": self.config.red_personality, "model": "mock"},
-                        "blue": {"personality": self.config.blue_personality, "model": "mock"},
-                    },
-                    "total_rounds": self.config.total_rounds,
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                    "state": "running",
-                    "rounds": [],
-                })
-            except Exception as e:
-                logger.warning("MongoDB match init failed: %s", e)
+            yield match_start_event
 
-        yield match_start_event
+            while not self._is_game_over():
+                async for event in self._run_round():
+                    yield event
 
-        while not self._is_game_over():
-            async for event in self._run_round():
-                yield event
+                self.game_state.round_number += 1
+                # Keep current_round in sync for gpu_bidding
+                if self.config.game_type == "gpu_bidding":
+                    self.game_state.current_round = self.game_state.round_number
+                await asyncio.sleep(self.config.round_delay)
 
-            self.game_state.round_number += 1
-            # Keep current_round in sync for gpu_bidding
-            if self.config.game_type == "gpu_bidding":
-                self.game_state.current_round = self.game_state.round_number
-            await asyncio.sleep(self.config.round_delay)
+            # --- match_end ---
+            winner = self._get_winner()
 
-        # --- match_end ---
-        winner = self._get_winner()
-
-        # --- Record strategy relationship in Neo4j ---
-        if self._neo4j_client and winner in ("red", "blue"):
-            loser = "blue" if winner == "red" else "red"
-            winner_personality = (
-                self.config.red_personality if winner == "red"
-                else self.config.blue_personality
-            )
-            loser_personality = (
-                self.config.blue_personality if winner == "red"
-                else self.config.red_personality
-            )
-            try:
-                await self._neo4j_client.store_strategy_relationship(
-                    winner_strategy=winner_personality,
-                    loser_strategy=loser_personality,
-                    match_id=self.config.match_id,
+            # --- Record strategy relationship in Neo4j ---
+            if self._neo4j_client and winner in ("red", "blue"):
+                loser = "blue" if winner == "red" else "red"
+                winner_personality = (
+                    self.config.red_personality if winner == "red"
+                    else self.config.blue_personality
                 )
-            except Exception as e:
-                logger.warning("Neo4j strategy relationship storage failed: %s", e)
+                loser_personality = (
+                    self.config.blue_personality if winner == "red"
+                    else self.config.red_personality
+                )
+                try:
+                    await self._neo4j_client.store_strategy_relationship(
+                        winner_strategy=winner_personality,
+                        loser_strategy=loser_personality,
+                        match_id=self.config.match_id,
+                    )
+                except Exception as e:
+                    logger.warning("Neo4j strategy relationship storage failed: %s", e)
 
-        red_accuracy = (
-            self.red_correct / self.red_total_predictions
-            if self.red_total_predictions > 0
-            else 0.0
-        )
-        blue_accuracy = (
-            self.blue_correct / self.blue_total_predictions
-            if self.blue_total_predictions > 0
-            else 0.0
-        )
-
-        match_end_event = {
-            "type": "match_end",
-            "winner": winner,
-            "finalScores": dict(self.game_state.scores),
-            "totalFuturesSimulated": self.total_futures_simulated,
-            "predictionAccuracy": {
-                "red": round(red_accuracy, 2),
-                "blue": round(blue_accuracy, 2),
-            },
-        }
-
-        if self._metrics:
-            self._metrics.log_match_result(
-                winner,
-                self.config.total_rounds,
-                abs(self.game_state.scores["red"] - self.game_state.scores["blue"]),
+            red_accuracy = (
+                self.red_correct / self.red_total_predictions
+                if self.red_total_predictions > 0
+                else 0.0
+            )
+            blue_accuracy = (
+                self.blue_correct / self.blue_total_predictions
+                if self.blue_total_predictions > 0
+                else 0.0
             )
 
-        # Finalize match in MongoDB
-        if self._mongodb_client:
-            try:
-                self._mongodb_client.finalize_match(self.config.match_id, match_end_event)
-            except Exception as e:
-                logger.warning("MongoDB match finalize failed: %s", e)
+            match_end_event = {
+                "type": "match_end",
+                "winner": winner,
+                "finalScores": dict(self.game_state.scores),
+                "totalFuturesSimulated": self.total_futures_simulated,
+                "predictionAccuracy": {
+                    "red": round(red_accuracy, 2),
+                    "blue": round(blue_accuracy, 2),
+                },
+            }
 
-        yield match_end_event
+            if self._metrics:
+                self._metrics.log_match_result(
+                    winner,
+                    self.config.total_rounds,
+                    abs(self.game_state.scores["red"] - self.game_state.scores["blue"]),
+                )
+
+            # Finalize match in MongoDB
+            if self._mongodb_client:
+                try:
+                    self._mongodb_client.finalize_match(self.config.match_id, match_end_event)
+                except Exception as e:
+                    logger.warning("MongoDB match finalize failed: %s", e)
+
+            _match_completed = True
+            yield match_end_event
+
+        finally:
+            # If match didn't complete normally (error, cancellation, client disconnect),
+            # mark it as abandoned in MongoDB so it doesn't stay stuck as "running".
+            if not _match_completed and self._mongodb_client:
+                try:
+                    from datetime import datetime, timezone
+                    self._mongodb_client.store_match({
+                        "match_id": self.config.match_id,
+                        "state": "abandoned",
+                        "ended_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                except Exception:
+                    pass
 
     def _is_game_over(self) -> bool:
         gt = self.config.game_type
@@ -478,12 +500,16 @@ class Match:
         """Get prediction from an agent with error handling."""
         try:
             if agent == "red":
+                opponent_personality = self.config.blue_personality
                 return await self.red_agent.predict_opponent(
-                    self.game_state, self.blue_history, self.red_history
+                    self.game_state, self.blue_history, self.red_history,
+                    opponent_personality=opponent_personality,
                 )
             else:
+                opponent_personality = self.config.red_personality
                 return await self.blue_agent.predict_opponent(
-                    self.game_state, self.red_history, self.blue_history
+                    self.game_state, self.red_history, self.blue_history,
+                    opponent_personality=opponent_personality,
                 )
         except Exception as e:
             logger.error("Agent %s prediction failed: %s", agent, e)

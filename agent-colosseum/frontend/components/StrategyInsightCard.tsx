@@ -67,11 +67,9 @@ function RiskMeter({ level, color }: { level: number; color: 'red' | 'blue' }) {
 
 export function StrategyInsightCard({ state }: { state: CommentatorState }) {
   const recentMoments = (state?.keyMoments ?? []).slice(-3);
-  const momentum = state?.momentum ?? { leader: '', confidence: 0, reason: '' };
-  const strategyAnalysis = state?.strategyAnalysis ?? {
-    red: { style: 'Analyzing...', currentTactic: '', riskLevel: 0.5 },
-    blue: { style: 'Analyzing...', currentTactic: '', riskLevel: 0.5 },
-  };
+  const momentum = state?.momentum ?? { leader: 'none' as const, confidence: 0, reason: '' };
+  const redAnalysis = state?.strategyAnalysis?.red ?? { style: 'analyzing...', currentTactic: '', riskLevel: 0 };
+  const blueAnalysis = state?.strategyAnalysis?.blue ?? { style: 'analyzing...', currentTactic: '', riskLevel: 0 };
 
   return (
     <motion.div
@@ -91,12 +89,12 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
         <div className="flex items-center gap-1.5">
           <Zap className="w-2.5 h-2.5 text-rose-400" />
           <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/10 truncate max-w-[100px]">
-            {strategyAnalysis.red?.style ?? 'Analyzing...'}
+            {redAnalysis.style}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/10 truncate max-w-[100px]">
-            {strategyAnalysis.blue?.style ?? 'Analyzing...'}
+            {blueAnalysis.style}
           </span>
           <Brain className="w-2.5 h-2.5 text-blue-400" />
         </div>
@@ -106,11 +104,11 @@ export function StrategyInsightCard({ state }: { state: CommentatorState }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-0.5">
           <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Red Risk</span>
-          <RiskMeter level={strategyAnalysis.red?.riskLevel ?? 0.5} color="red" />
+          <RiskMeter level={redAnalysis.riskLevel} color="red" />
         </div>
         <div className="space-y-0.5">
           <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Blue Risk</span>
-          <RiskMeter level={strategyAnalysis.blue?.riskLevel ?? 0.5} color="blue" />
+          <RiskMeter level={blueAnalysis.riskLevel} color="blue" />
         </div>
       </div>
 

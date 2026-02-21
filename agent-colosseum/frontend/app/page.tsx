@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Gavel, Handshake, Swords, History, Cpu, ArrowRight, Activity, Zap, Brain, Shield, Terminal } from 'lucide-react';
@@ -73,6 +73,15 @@ export default function Home() {
   const [redPersonality, setRedPersonality] = useState<AgentConfig['personality']>('aggressive');
   const [bluePersonality, setBluePersonality] = useState<AgentConfig['personality']>('defensive');
   const [isStarting, setIsStarting] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'live' | 'mock' | 'offline'>('checking');
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    fetch(`${apiUrl}/health`)
+      .then((r) => r.json())
+      .then((d) => setBackendStatus(d.mock_mode ? 'mock' : 'live'))
+      .catch(() => setBackendStatus('offline'));
+  }, []);
 
   const selectedGameOption = gameTypes.find(g => g.id === selectedGame)!;
 
@@ -121,7 +130,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center justify-center"
+            className="inline-flex items-center justify-center gap-3"
           >
              <span className="relative inline-block overflow-hidden rounded-full p-[1px]">
                 <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)]" />
@@ -129,6 +138,22 @@ export default function Home() {
                   Agent Colosseum 2026
                 </div>
               </span>
+              {backendStatus !== 'checking' && (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono border ${
+                  backendStatus === 'live'
+                    ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                    : backendStatus === 'mock'
+                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+                    : 'bg-red-500/10 text-red-400 border-red-500/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    backendStatus === 'live' ? 'bg-green-400 animate-pulse'
+                    : backendStatus === 'mock' ? 'bg-yellow-400 animate-pulse'
+                    : 'bg-red-400'
+                  }`} />
+                  {backendStatus === 'live' ? 'Live AI' : backendStatus === 'mock' ? 'Mock Mode' : 'Backend Offline'}
+                </span>
+              )}
           </motion.div>
 
           <motion.h1
@@ -224,6 +249,8 @@ export default function Home() {
            <div>&copy; 2026 Agent Colosseum. All rights reserved.</div>
            <div className="flex items-center gap-6 mt-4 md:mt-0">
              <button onClick={() => router.push('/history')} className="hover:text-white transition-colors">Match History</button>
+             <button onClick={() => router.push('/leaderboard')} className="hover:text-white transition-colors">Leaderboard</button>
+             <button onClick={() => router.push('/neo4j')} className="hover:text-white transition-colors">Strategy Graph</button>
              <a href="#" className="hover:text-white transition-colors">Docs</a>
              <a href="#" className="hover:text-white transition-colors">GitHub</a>
            </div>

@@ -9,7 +9,7 @@ interface Props {
 
 export function CopilotKitProvider({ children }: Props) {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" agent="arena-commentator">
+    <CopilotKit runtimeUrl="/api/copilotkit" agent="arena-commentator" showDevConsole={false}>
       {children}
     </CopilotKit>
   );

@@ -173,11 +173,11 @@ export default function HistoryPage() {
                 <div className="flex items-center gap-4">
                    <div className={clsx(
                      "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border",
-                     match.state === 'finished' 
+                     match.state === 'finished' || match.state === 'completed'
                        ? "bg-green-500/10 text-green-400 border-green-500/20" 
                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                    )}>
-                     {match.state === 'finished' ? 'Concluded' : 'In Progress'}
+                     {match.state === 'finished' || match.state === 'completed'? 'Concluded' : 'In Progress'}
                    </div>
                    <ArrowRight className="w-5 h-5 text-zinc-600 group-hover:text-white transition-colors group-hover:translate-x-1 duration-300" />
                 </div>

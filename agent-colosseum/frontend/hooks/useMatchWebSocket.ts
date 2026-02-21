@@ -472,7 +472,10 @@ export function useMatchWebSocket(matchId: string | null) {
   useEffect(() => {
     if (!matchId || isMock) return;
 
-    const wsHost = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+    // Derive WS URL from API URL if NEXT_PUBLIC_WS_URL is not set
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const defaultWsHost = apiUrl.replace(/^http/, 'ws');
+    const wsHost = process.env.NEXT_PUBLIC_WS_URL || defaultWsHost;
     const wsUrl = `${wsHost}/ws/match/${matchId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
