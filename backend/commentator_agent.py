@@ -29,14 +29,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 try:
-    from copilotkit.langchain import copilotkit_emit_state as _copilotkit_emit_state  # type: ignore
+    from copilotkit.langgraph import copilotkit_emit_state as _copilotkit_emit_state  # type: ignore
     _EMIT_STATE_AVAILABLE = True
 except Exception:
     _EMIT_STATE_AVAILABLE = False
     _copilotkit_emit_state = None
 
 try:
-    from copilotkit.langchain import copilotkit_emit_tool_call as _copilotkit_emit_tool_call  # type: ignore
+    from copilotkit.langgraph import copilotkit_emit_tool_call as _copilotkit_emit_tool_call  # type: ignore
     _EMIT_TOOL_CALL_AVAILABLE = True
 except Exception:
     _EMIT_TOOL_CALL_AVAILABLE = False
@@ -167,26 +167,12 @@ def analyze_match_node(state: CommentatorState, config: dict) -> dict:
 def emit_state_node(state: CommentatorState, config: dict) -> dict:
     """Emit the current analysis state to CopilotKit so the frontend receives it.
 
+    copilotkit_emit_state is a synchronous function — call it directly.
     This is a no-op if copilotkit_emit_state is not available.
     """
     if _EMIT_STATE_AVAILABLE and _copilotkit_emit_state is not None:
         try:
-            # copilotkit_emit_state(config, state) — config is a RunnableConfig dict
-            import asyncio
-
-            async def _emit():
-                await _copilotkit_emit_state(config, dict(state))
-
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Schedule it but don't await — best-effort in sync context
-                    loop.create_task(_emit())
-                else:
-                    loop.run_until_complete(_emit())
-            except RuntimeError:
-                # No event loop — skip silently
-                pass
+            _copilotkit_emit_state(config, dict(state))
         except Exception as exc:
             logger.warning("emit_state_node: copilotkit_emit_state failed: %s", exc)
     return {}
@@ -285,6 +271,7 @@ def generate_commentary_node(state: CommentatorState, config: dict) -> dict:
 def emit_insight_node(state: CommentatorState, config: dict) -> dict:
     """Emit tool calls for showInsightCard and highlight_prediction.
 
+    copilotkit_emit_tool_call is a synchronous function — call it directly.
     Uses copilotkit_emit_tool_call if available; otherwise no-op.
     """
     if not (_EMIT_TOOL_CALL_AVAILABLE and _copilotkit_emit_tool_call is not None):
@@ -311,52 +298,40 @@ def emit_insight_node(state: CommentatorState, config: dict) -> dict:
 
         insight = _build_insight_card(agent_state_for_insight)
 
-        import asyncio
+        # Emit showInsightCard if there is an insight
+        if insight:
+            try:
+                _copilotkit_emit_tool_call(
+                    config,
+                    name="showInsightCard",
+                    args=insight,
+                )
+            except Exception as exc:
+                logger.warning("emit_insight_node: showInsightCard failed: %s", exc)
 
-        async def _emit_calls():
-            # Emit showInsightCard if there is an insight
-            if insight:
+        # Emit highlight_prediction if leader has a prediction trend
+        momentum = state.get("momentum", {})
+        leader = momentum.get("leader", "none")
+        prediction_trends = state.get("prediction_trends", {})
+
+        if leader not in ("none", "tied") and prediction_trends.get(leader):
+            trends = prediction_trends[leader]
+            latest_accuracy = trends[-1] if trends else None
+            if latest_accuracy is not None:
                 try:
-                    await _copilotkit_emit_tool_call(
+                    _copilotkit_emit_tool_call(
                         config,
-                        name="showInsightCard",
-                        args=insight,
+                        name="highlight_prediction",
+                        args={
+                            "agent": leader,
+                            "accuracy": latest_accuracy,
+                            "round": state.get("match_progress", {}).get("round", 0),
+                        },
                     )
                 except Exception as exc:
-                    logger.warning("emit_insight_node: showInsightCard failed: %s", exc)
-
-            # Emit highlight_prediction if leader has a prediction trend
-            momentum = state.get("momentum", {})
-            leader = momentum.get("leader", "none")
-            prediction_trends = state.get("prediction_trends", {})
-
-            if leader not in ("none", "tied") and prediction_trends.get(leader):
-                trends = prediction_trends[leader]
-                latest_accuracy = trends[-1] if trends else None
-                if latest_accuracy is not None:
-                    try:
-                        await _copilotkit_emit_tool_call(
-                            config,
-                            name="highlight_prediction",
-                            args={
-                                "agent": leader,
-                                "accuracy": latest_accuracy,
-                                "round": state.get("match_progress", {}).get("round", 0),
-                            },
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "emit_insight_node: highlight_prediction failed: %s", exc
-                        )
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(_emit_calls())
-            else:
-                loop.run_until_complete(_emit_calls())
-        except RuntimeError:
-            pass
+                    logger.warning(
+                        "emit_insight_node: highlight_prediction failed: %s", exc
+                    )
 
     except Exception as exc:
         logger.error("emit_insight_node error: %s", exc, exc_info=True)
