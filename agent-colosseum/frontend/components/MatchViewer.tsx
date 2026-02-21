@@ -9,6 +9,7 @@ import { NegotiationView } from './NegotiationView';
 import { AuctionView } from './AuctionView';
 import { GPUBiddingView } from './GPUBiddingView';
 import { AudiencePoll } from './AudiencePoll';
+import { LiveGraphAnalysis } from './LiveGraphAnalysis';
 import type { MatchState } from '@/lib/types';
 import { Trophy, ArrowLeft, Activity, Radio, Cpu, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -389,8 +390,12 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <AICommentator matchState={matchState} />
+             <LiveGraphAnalysis 
+               graphAnalysis={matchState.graphAnalysis}
+               gameType={matchState.gameType}
+             />
              <AudiencePoll
                currentRound={matchState.currentRound}
                phase={matchState.phase}

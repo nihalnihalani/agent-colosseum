@@ -125,6 +125,7 @@ export interface MatchState {
   accuracy: { red: number; blue: number };
   totalFuturesSimulated: number;
   winner?: string;
+  graphAnalysis?: GraphAnalysisData;
 }
 
 export interface MatchConfig {
@@ -169,6 +170,61 @@ export interface ReplayEvent {
   [key: string]: unknown;
 }
 
+// Graph analysis types for Neo4j integration
+export interface GraphNode {
+  id: string;
+  name: string;
+  val: number;
+  type: string;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  type: string;
+  wins: number;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+export interface PredictionAccuracyEntry {
+  predicted_move: string;
+  total_predictions: number;
+  correct: number;
+  accuracy: number;
+}
+
+export interface NegotiationPatternEntry {
+  match_id: string;
+  round_number: number;
+  move_type: string;
+  price: number;
+}
+
+export interface StrategyEvolutionEntry {
+  match_id: string;
+  round_number: number;
+  strategy: string;
+  prediction_correct: boolean;
+  confidence: number;
+}
+
+export interface AgentGraphAnalysis {
+  predictionAccuracy: PredictionAccuracyEntry[];
+  negotiationPatterns: NegotiationPatternEntry[];
+  strategyEvolution: StrategyEvolutionEntry[];
+}
+
+export interface GraphAnalysisData {
+  round: number;
+  redAnalysis: AgentGraphAnalysis;
+  blueAnalysis: AgentGraphAnalysis;
+  graphData: GraphData;
+}
+
 // WebSocket event types
 export type WSEventType =
   | 'match_start'
@@ -178,7 +234,8 @@ export type WSEventType =
   | 'thinking_end'
   | 'collapse'
   | 'round_end'
-  | 'match_end';
+  | 'match_end'
+  | 'graph_analysis';
 
 export interface WSEvent {
   type: WSEventType;

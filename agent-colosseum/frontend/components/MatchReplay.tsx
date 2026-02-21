@@ -12,8 +12,10 @@ import type {
   GameType,
   NegotiationGameState,
   AuctionGameState,
+  GPUBiddingGameState,
   ReplayEvent,
   WSEvent,
+  GraphAnalysisData,
 } from '@/lib/types';
 import { clsx } from 'clsx';
 
@@ -69,6 +71,7 @@ function applyEvent(state: MatchState, event: ReplayEvent): MatchState {
       };
       if (e.negotiationState) next.negotiationState = e.negotiationState as NegotiationGameState;
       if (e.auctionState) next.auctionState = e.auctionState as AuctionGameState;
+      if (e.gpuBiddingState) next.gpuBiddingState = e.gpuBiddingState as GPUBiddingGameState;
       return next;
     }
 
@@ -118,6 +121,7 @@ function applyEvent(state: MatchState, event: ReplayEvent): MatchState {
       };
       if (e.negotiationState) rState.negotiationState = e.negotiationState as NegotiationGameState;
       if (e.auctionState) rState.auctionState = e.auctionState as AuctionGameState;
+      if (e.gpuBiddingState) rState.gpuBiddingState = e.gpuBiddingState as GPUBiddingGameState;
       return rState;
     }
 
@@ -132,6 +136,17 @@ function applyEvent(state: MatchState, event: ReplayEvent): MatchState {
         accuracy: (e.predictionAccuracy as MatchState['accuracy']) || state.accuracy,
         totalFuturesSimulated: (e.totalFuturesSimulated as number) || state.totalFuturesSimulated,
         phase: 'match_end',
+      };
+
+    case 'graph_analysis':
+      return {
+        ...state,
+        graphAnalysis: {
+          round: e.round as number,
+          redAnalysis: e.redAnalysis as GraphAnalysisData['redAnalysis'],
+          blueAnalysis: e.blueAnalysis as GraphAnalysisData['blueAnalysis'],
+          graphData: e.graphData as GraphAnalysisData['graphData'],
+        },
       };
 
     default:

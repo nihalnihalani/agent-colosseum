@@ -12,6 +12,7 @@ import type {
   AuctionGameState,
   GPUBiddingGameState,
   WSEvent,
+  GraphAnalysisData,
 } from '@/lib/types';
 
 const MOCK_PERSONALITIES = ['aggressive', 'defensive', 'adaptive', 'chaotic'] as const;
@@ -207,6 +208,18 @@ export function useMatchWebSocket(matchId: string | null) {
           accuracy: event.predictionAccuracy as MatchState['accuracy'],
           totalFuturesSimulated: event.totalFuturesSimulated as number,
           phase: 'match_end' as MatchPhase,
+        }));
+        break;
+
+      case 'graph_analysis':
+        setMatchState((prev) => ({
+          ...prev,
+          graphAnalysis: {
+            round: event.round as number,
+            redAnalysis: event.redAnalysis as GraphAnalysisData['redAnalysis'],
+            blueAnalysis: event.blueAnalysis as GraphAnalysisData['blueAnalysis'],
+            graphData: event.graphData as GraphAnalysisData['graphData'],
+          },
         }));
         break;
     }
@@ -454,6 +467,52 @@ export function useMatchWebSocket(matchId: string | null) {
                 }
 
                 handleEvent(roundEndEvent);
+
+                // Emit mock graph analysis data
+                const mockStrategies = ['aggressive', 'defensive', 'adaptive', 'chaotic', 'bluffer'];
+                const mockGraphNodes = mockStrategies.slice(0, Math.min(round + 1, mockStrategies.length)).map((s, i) => ({
+                  id: s,
+                  name: s,
+                  val: Math.floor(Math.random() * 5) + 1,
+                  type: 'Strategy',
+                }));
+                const mockGraphLinks = mockGraphNodes.length > 1 ? mockGraphNodes.slice(0, -1).map((node, i) => ({
+                  source: node.id,
+                  target: mockGraphNodes[i + 1].id,
+                  type: 'BEATS',
+                  wins: Math.floor(Math.random() * 3) + 1,
+                })) : [];
+
+                handleEvent({
+                  type: 'graph_analysis',
+                  round,
+                  redAnalysis: {
+                    predictionAccuracy: [
+                      { predicted_move: 'aggressive_bid', total_predictions: round * 2, correct: Math.floor(round * redAcc), accuracy: redAcc },
+                    ],
+                    negotiationPatterns: gameType === 'negotiation' ? [
+                      { match_id: 'mock', round_number: round, move_type: redChosenMove.type, price: redChosenMove.amount },
+                    ] : [],
+                    strategyEvolution: [
+                      { match_id: 'mock', round_number: round, strategy: config.redPersonality, prediction_correct: redAcc > 0.5, confidence: redAcc },
+                    ],
+                  },
+                  blueAnalysis: {
+                    predictionAccuracy: [
+                      { predicted_move: 'defensive_spread', total_predictions: round * 2, correct: Math.floor(round * blueAcc), accuracy: blueAcc },
+                    ],
+                    negotiationPatterns: gameType === 'negotiation' ? [
+                      { match_id: 'mock', round_number: round, move_type: blueChosenMove.type, price: blueChosenMove.amount },
+                    ] : [],
+                    strategyEvolution: [
+                      { match_id: 'mock', round_number: round, strategy: config.bluePersonality, prediction_correct: blueAcc > 0.5, confidence: blueAcc },
+                    ],
+                  },
+                  graphData: {
+                    nodes: mockGraphNodes,
+                    links: mockGraphLinks,
+                  },
+                });
 
                 // Next round
                 mockTimerRef.current = setTimeout(runRound, 2000);

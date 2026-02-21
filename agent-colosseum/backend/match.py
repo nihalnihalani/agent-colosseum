@@ -421,6 +421,8 @@ class Match:
             round_end_event["negotiationState"] = self.game_state.to_dict()
         elif self.config.game_type == "auction":
             round_end_event["auctionState"] = self.game_state.to_dict()
+        elif self.config.game_type == "gpu_bidding":
+            round_end_event["gpuBiddingState"] = self.game_state.to_dict()
         yield round_end_event
 
         # --- Metrics ---
@@ -458,6 +460,21 @@ class Match:
                             "blue_predictions": blue_preds_annotated,
                         },
                     )
+                elif gt == "gpu_bidding":
+                    current_gpu = state_before.current_gpu
+                    await self._neo4j_client.store_gpu_bidding_round(
+                        match_id=self.config.match_id,
+                        round_data={
+                            "round": round_num,
+                            "state_hash": state_before.state_hash(),
+                            "gpu_name": current_gpu.name if current_gpu else "",
+                            "market_demand": state_before.market_demand,
+                            "red_move": red_move.to_dict(),
+                            "blue_move": blue_move.to_dict(),
+                            "red_predictions": red_preds_annotated,
+                            "blue_predictions": blue_preds_annotated,
+                        },
+                    )
                 else:
                     await self._neo4j_client.store_round(
                         match_id=self.config.match_id,
@@ -473,6 +490,72 @@ class Match:
                     )
             except Exception as e:
                 logger.warning("Neo4j storage failed: %s", e)
+
+        # --- Emit graph analysis event ---
+        if self._neo4j_client:
+            try:
+                # Query Neo4j for live graph analysis
+                red_patterns = await self._neo4j_client.get_prediction_accuracy("red")
+                blue_patterns = await self._neo4j_client.get_prediction_accuracy("blue")
+                
+                # Get negotiation-specific patterns if applicable
+                red_neg_patterns = []
+                blue_neg_patterns = []
+                if gt == "negotiation":
+                    red_neg_patterns = await self._neo4j_client.get_negotiation_patterns("red")
+                    blue_neg_patterns = await self._neo4j_client.get_negotiation_patterns("blue")
+                
+                # Get strategy evolution
+                red_evolution = await self._neo4j_client.get_strategy_evolution("red")
+                blue_evolution = await self._neo4j_client.get_strategy_evolution("blue")
+                
+                # Get win matrix for graph visualization
+                win_matrix = await self._neo4j_client.get_win_matrix()
+                
+                # Build graph nodes and links from win matrix
+                win_totals: dict[str, int] = {}
+                for row in win_matrix:
+                    winner = row.get("winner_strategy", "")
+                    wins = row.get("wins", 0)
+                    win_totals[winner] = win_totals.get(winner, 0) + wins
+                    loser = row.get("loser_strategy", "")
+                    if loser and loser not in win_totals:
+                        win_totals[loser] = 0
+                
+                graph_nodes = [
+                    {"id": name, "name": name, "val": max(win_totals.get(name, 1), 1), "type": "Strategy"}
+                    for name in win_totals
+                ]
+                graph_links = [
+                    {
+                        "source": row.get("winner_strategy", ""),
+                        "target": row.get("loser_strategy", ""),
+                        "type": "BEATS",
+                        "wins": row.get("wins", 0),
+                    }
+                    for row in win_matrix
+                ]
+                
+                yield {
+                    "type": "graph_analysis",
+                    "round": round_num,
+                    "redAnalysis": {
+                        "predictionAccuracy": red_patterns,
+                        "negotiationPatterns": red_neg_patterns,
+                        "strategyEvolution": red_evolution[-10:] if red_evolution else [],
+                    },
+                    "blueAnalysis": {
+                        "predictionAccuracy": blue_patterns,
+                        "negotiationPatterns": blue_neg_patterns,
+                        "strategyEvolution": blue_evolution[-10:] if blue_evolution else [],
+                    },
+                    "graphData": {
+                        "nodes": graph_nodes,
+                        "links": graph_links,
+                    },
+                }
+            except Exception as e:
+                logger.warning("Failed to emit graph analysis: %s", e)
 
         # --- MongoDB round storage ---
         if self._mongodb_client:
