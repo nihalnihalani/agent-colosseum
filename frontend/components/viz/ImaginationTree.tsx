@@ -70,6 +70,7 @@ export default function ImaginationTree({
       const nodes: GraphNode[] = [{
         id: 'root', label: agentName,
         color: agentColor, isRoot: true,
+        x: 0, y: 0, z: 0,
       }];
       const links: GraphLink[] = [];
 
@@ -85,9 +86,15 @@ export default function ImaginationTree({
           else if (pred.wasCorrect === false) { conf = 0.3; }
         }
 
+        // Spread initial positions around the root to prevent d3-force NaN
+        // (charge force divides by zero when nodes overlap at origin)
+        const angle = (i / Math.max(count, 1)) * Math.PI * 2;
         nodes.push({
           id, label: `${pred.opponentMove}\n${Math.round(pred.confidence * 100)}%`,
           color: nodeColor, isRoot: false, confidence: conf, wasCorrect: pred.wasCorrect,
+          x: Math.cos(angle) * 30,
+          y: Math.sin(angle) * 15,
+          z: Math.sin(angle) * 30,
         });
         links.push({
           source: 'root', target: id,
@@ -200,6 +207,9 @@ export default function ImaginationTree({
       graph.d3Force('link')?.distance(90);
       graph.d3Force('center')?.strength(2);
 
+      // Let simulation settle before rendering to avoid NaN positions
+      graph.warmupTicks(30).cooldownTime(5000);
+
       // ── Animated 3-point lighting rig (from reference) ────────────────────
       const scene = graph.scene();
       if (scene) {
@@ -283,8 +293,8 @@ export default function ImaginationTree({
     if (!graphRef.current) return;
     const data = buildGraphData(visibleCount, phase);
     graphRef.current.graphData(data);
-    graphRef.current.nodeThreeObject(graphRef.current.nodeThreeObject());
-    // No zoomToFit here — handled once by onEngineStop
+    // nodeThreeObject callback is already set — graphData triggers re-render.
+    // Re-invoking nodeThreeObject() mid-tick can hit NaN positions.
   }, [visibleCount, phase, buildGraphData]);
 
   // ── Resize observer ───────────────────────────────────────────────────────
@@ -293,7 +303,9 @@ export default function ImaginationTree({
     const obs = new ResizeObserver((entries) => {
       if (graphRef.current) {
         const { width, height } = entries[0].contentRect;
-        graphRef.current.width(width).height(height);
+        if (width > 0 && height > 0) {
+          graphRef.current.width(width).height(height);
+        }
       }
     });
     obs.observe(containerRef.current);
