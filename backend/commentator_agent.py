@@ -164,15 +164,15 @@ def analyze_match_node(state: CommentatorState, config: dict) -> dict:
 # Node: emit_state_node
 # ---------------------------------------------------------------------------
 
-def emit_state_node(state: CommentatorState, config: dict) -> dict:
+async def emit_state_node(state: CommentatorState, config: dict) -> dict:
     """Emit the current analysis state to CopilotKit so the frontend receives it.
 
-    copilotkit_emit_state is a synchronous function — call it directly.
+    copilotkit_emit_state is a coroutine — await it directly.
     This is a no-op if copilotkit_emit_state is not available.
     """
     if _EMIT_STATE_AVAILABLE and _copilotkit_emit_state is not None:
         try:
-            _copilotkit_emit_state(config, dict(state))
+            await _copilotkit_emit_state(config, dict(state))
         except Exception as exc:
             logger.warning("emit_state_node: copilotkit_emit_state failed: %s", exc)
     return {}
@@ -268,10 +268,10 @@ def generate_commentary_node(state: CommentatorState, config: dict) -> dict:
 # Node: emit_insight_node
 # ---------------------------------------------------------------------------
 
-def emit_insight_node(state: CommentatorState, config: dict) -> dict:
+async def emit_insight_node(state: CommentatorState, config: dict) -> dict:
     """Emit tool calls for showInsightCard and highlight_prediction.
 
-    copilotkit_emit_tool_call is a synchronous function — call it directly.
+    copilotkit_emit_tool_call is a coroutine — await it directly.
     Uses copilotkit_emit_tool_call if available; otherwise no-op.
     """
     if not (_EMIT_TOOL_CALL_AVAILABLE and _copilotkit_emit_tool_call is not None):
@@ -301,7 +301,7 @@ def emit_insight_node(state: CommentatorState, config: dict) -> dict:
         # Emit showInsightCard if there is an insight
         if insight:
             try:
-                _copilotkit_emit_tool_call(
+                await _copilotkit_emit_tool_call(
                     config,
                     name="showInsightCard",
                     args=insight,
@@ -319,7 +319,7 @@ def emit_insight_node(state: CommentatorState, config: dict) -> dict:
             latest_accuracy = trends[-1] if trends else None
             if latest_accuracy is not None:
                 try:
-                    _copilotkit_emit_tool_call(
+                    await _copilotkit_emit_tool_call(
                         config,
                         name="highlight_prediction",
                         args={

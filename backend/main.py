@@ -596,28 +596,15 @@ async def websocket_match(websocket: WebSocket, match_id: str):
 # ---------------------------------------------------------------------------
 
 try:
-    from copilotkit import CopilotKitRemoteEndpoint
+    from copilotkit import CopilotKitRemoteEndpoint, LangGraphAgent
     from copilotkit.integrations.fastapi import add_fastapi_endpoint
     from backend.commentator_agent import commentator_graph, set_match_store as _ck_set_store
-
-    # Prefer LangGraphAGUIAgent (properly converts LangGraph events to AG-UI protocol).
-    # Fall back to LangGraphAgent if the newer class is not yet available.
-    try:
-        from copilotkit.langgraph import LangGraphAgent as _LangGraphAgentClass
-    except ImportError:
-        try:
-            from copilotkit import LangGraphAgent as _LangGraphAgentClass  # type: ignore
-        except ImportError:
-            _LangGraphAgentClass = None  # type: ignore
-
-    if _LangGraphAgentClass is None:
-        raise ImportError("No LangGraphAgent class found in copilotkit")
 
     _ck_set_store(_matches)
 
     sdk = CopilotKitRemoteEndpoint(
         agents=[
-            _LangGraphAgentClass(
+            LangGraphAgent(
                 name="arena-commentator",
                 description=(
                     "AI sports commentator for Agent Colosseum. "
