@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { Gavel, Handshake, Swords, History, Cpu, ArrowRight, Activity, Zap, Brain, Shield, Terminal } from 'lucide-react';
 import type { AgentConfig, GameType } from '@/lib/types';
 import { BentoGrid, BentoGridItem } from '@/components/ui/BentoGrid';
@@ -37,7 +38,7 @@ const gameTypes = [
     id: 'resource_wars',
     title: 'Resource Wars',
     description: 'Compete for strategic resources across multiple fronts. Predict allocations and outmaneuver.',
-    header: <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-neutral-900 to-neutral-800" />,
+    header: <div className="relative flex flex-1 w-full h-full min-h-[6rem] rounded-xl overflow-hidden bg-neutral-900"><Image src="/resource-wars.png" alt="Resource Wars" fill className="object-cover" /></div>,
     icon: <Swords className="h-4 w-4 text-neutral-500" />,
     defaultRounds: 10,
   },
@@ -45,7 +46,7 @@ const gameTypes = [
     id: 'negotiation',
     title: 'Negotiation',
     description: 'Seller vs buyer. Bluff, propose, counter-offer, and find the deal — or walk away.',
-    header: <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-violet-900 to-violet-800" />,
+    header: <div className="relative flex flex-1 w-full h-full min-h-[6rem] rounded-xl overflow-hidden bg-neutral-900"><Image src="/negotiation.png" alt="Negotiation" fill className="object-cover" /></div>,
     icon: <Handshake className="h-4 w-4 text-neutral-500" />,
     defaultRounds: 5,
   },
@@ -53,7 +54,7 @@ const gameTypes = [
     id: 'auction',
     title: 'Auction',
     description: 'Bid on 8 unique items with hidden valuations. Manage your budget and outbid your rival.',
-    header: <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-amber-900 to-amber-800" />,
+    header: <div className="relative flex flex-1 w-full h-full min-h-[6rem] rounded-xl overflow-hidden bg-neutral-900"><Image src="/auction.png" alt="Auction" fill className="object-cover" /></div>,
     icon: <Gavel className="h-4 w-4 text-neutral-500" />,
     defaultRounds: 8,
   },
@@ -93,7 +94,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-black relative overflow-hidden">
+    <div className="min-h-screen w-full bg-black relative overflow-x-hidden">
       {/* Replaced Spotlight with TubesBackground as the main wrapper/background */}
       <TubesBackground className="absolute inset-0 z-0 bg-black">
          {/* Empty children here because we just want the background effect, content sits on top visually or we wrap it.
@@ -192,13 +193,13 @@ export default function Home() {
            </div>
 
            {/* Right: Agent Config */}
-           <div className="lg:col-span-5 space-y-6 sticky top-10">
+           <div className="lg:col-span-5 space-y-6 sticky top-10 z-20">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Brain className="w-5 h-5 text-neutral-400" />
                 Configure Agents
               </h2>
               
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/80 p-6 backdrop-blur-xl relative overflow-hidden">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/80 p-6 backdrop-blur-xl relative">
                 <div className="absolute inset-0 bg-gradient-to-b from-violet-500/5 to-transparent pointer-events-none" />
                 
                 <div className="space-y-6 relative z-10">
@@ -237,7 +238,7 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-neutral-800 pt-8 pb-20 flex flex-col md:flex-row justify-between items-center text-neutral-500 text-sm backdrop-blur-sm">
+        <footer className="relative z-10 border-t border-neutral-800 pt-8 pb-20 flex flex-col md:flex-row justify-between items-center text-neutral-500 text-sm backdrop-blur-sm">
            <div>&copy; 2026 Agent Colosseum. All rights reserved.</div>
            <div className="flex items-center gap-6 mt-4 md:mt-0">
              <button onClick={() => router.push('/history')} className="hover:text-white transition-colors">Match History</button>

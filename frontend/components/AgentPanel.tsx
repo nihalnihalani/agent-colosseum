@@ -60,6 +60,28 @@ export function AgentPanel({
   phase,
   accuracy,
 }: AgentPanelProps) {
+  // ── Freeze last predictions so the tree stays visible between rounds ──────
+  // When round_start clears predictions the 3D tree would go blank for
+  // ~several seconds until the new predictions arrive.  Instead we keep
+  // displaying the previous round's revealed tree while the next round loads.
+  const [frozenPredictions, setFrozenPredictions] = useState<Prediction[]>([]);
+
+  useEffect(() => {
+    if (predictions.length > 0) {
+      setFrozenPredictions(predictions);
+    }
+  }, [predictions]);
+
+  // When current predictions are empty (gap between rounds) use the frozen
+  // ones in 'revealed' state so the tree remains visible and fully shown.
+  const vizPredictions = predictions.length > 0 ? predictions : frozenPredictions;
+  const vizPhase: 'waiting' | 'thinking' | 'committed' | 'revealed' =
+    predictions.length > 0
+      ? toVizPhase(phase)
+      : frozenPredictions.length > 0
+        ? 'revealed'
+        : 'waiting';
+
   // Listen for arena:highlight events dispatched by the AI commentator agent
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
 
@@ -137,23 +159,24 @@ export function AgentPanel({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 p-5 overflow-y-auto relative min-h-[300px] z-10">
+      <div className={`flex-1 relative min-h-[300px] z-10 ${use3DTree && vizPredictions.length > 0 ? 'overflow-hidden' : 'p-5 overflow-y-auto'}`}>
+        {/* Overlay spinner while thinking — sits on top of the frozen tree */}
         {phase === 'thinking' && predictions.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-12 h-12 rounded-full border-2 border-neutral-800 border-t-neutral-500 animate-spin mb-4" />
-            <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest">
-              Processing...
+          <div className={`absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20 ${frozenPredictions.length > 0 ? 'bg-black/40 backdrop-blur-[2px]' : ''}`}>
+            <div className="w-10 h-10 rounded-full border-2 border-neutral-700 border-t-neutral-400 animate-spin mb-3" />
+            <p className="text-neutral-400 text-xs font-mono uppercase tracking-widest">
+              Computing next move...
             </p>
           </div>
         )}
 
-        {predictions.length > 0 && (
+        {vizPredictions.length > 0 && (
           <div className="h-full">
             {use3DTree ? (
-              <div className="h-full min-h-[300px] rounded-xl overflow-hidden border border-neutral-800 bg-black/40 relative">
+              <div className="absolute inset-0 rounded-b-xl overflow-hidden bg-black/40">
                 <ImaginationTree
-                  predictions={predictions}
-                  phase={toVizPhase(phase)}
+                  predictions={vizPredictions}
+                  phase={vizPhase}
                   agentColor={isRed ? '#ef4444' : '#3b82f6'}
                   agentName={isRed ? 'Agent Red' : 'Agent Blue'}
                 />

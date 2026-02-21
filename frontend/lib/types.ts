@@ -141,7 +141,8 @@ export type WSEventType =
   | 'thinking_end'
   | 'collapse'
   | 'round_end'
-  | 'match_end';
+  | 'match_end'
+  | 'ping';
 
 export interface WSEvent {
   type: WSEventType;

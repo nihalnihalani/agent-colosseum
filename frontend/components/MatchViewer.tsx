@@ -342,7 +342,7 @@ export function MatchViewer({ matchState }: MatchViewerProps) {
       </AnimatePresence>
 
       {/* Header - Clean & Minimal */}
-      <header className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#030304]/80 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#030304]/80 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => router.push('/')}

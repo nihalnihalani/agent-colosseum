@@ -15,7 +15,7 @@ export default function ReplayPage() {
 
   useEffect(() => {
     if (!matchId) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8888';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     fetch(`${apiUrl}/api/match/${matchId}/replay`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load replay');

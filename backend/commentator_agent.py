@@ -333,6 +333,46 @@ async def emit_insight_node(state: CommentatorState, config: dict) -> dict:
                         "emit_insight_node: highlight_prediction failed: %s", exc
                     )
 
+        # Emit play_sfx based on match phase
+        match_progress = state.get("match_progress", {})
+        phase = match_progress.get("phase", "")
+        sfx_name = None
+        if phase == "match_end":
+            sfx_name = "fanfare"
+        elif momentum.get("shift", False):
+            sfx_name = "clash"
+        elif momentum.get("confidence", 0) < 0.3:
+            sfx_name = "suspense"
+
+        if sfx_name:
+            try:
+                await _copilotkit_emit_tool_call(
+                    config,
+                    name="play_sfx",
+                    args={"name": sfx_name},
+                )
+            except Exception as exc:
+                logger.warning("emit_insight_node: play_sfx failed: %s", exc)
+
+        # Emit announce_insight for dramatic moments
+        key_moments = state.get("key_moments", [])
+        if key_moments:
+            latest_moment = key_moments[-1] if isinstance(key_moments[-1], dict) else {}
+            impact = latest_moment.get("impact", "")
+            event_text = latest_moment.get("event", "")
+            if impact in ("high", "critical") and event_text:
+                try:
+                    await _copilotkit_emit_tool_call(
+                        config,
+                        name="announce_insight",
+                        args={
+                            "text": event_text,
+                            "type": "dramatic" if impact == "critical" else "info",
+                        },
+                    )
+                except Exception as exc:
+                    logger.warning("emit_insight_node: announce_insight failed: %s", exc)
+
     except Exception as exc:
         logger.error("emit_insight_node error: %s", exc, exc_info=True)
 

@@ -20,7 +20,7 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8888';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     fetch(`${apiUrl}/api/matches`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load matches');

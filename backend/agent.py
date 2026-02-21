@@ -90,7 +90,11 @@ def _llmobs_submit_evaluation(
     try:
         for i, pred in enumerate(predictions):
             predicted = pred.get("opponentMove", "")
-            was_correct = predicted == actual_move
+            # Compare move type only — predictions use "aggressive_bid" while
+            # actual moves include target suffix like "aggressive_bid_A"
+            predicted_type = predicted.split("_")[0] if "_" in predicted else predicted
+            actual_type = actual_move.split("_")[0] if "_" in actual_move else actual_move
+            was_correct = predicted == actual_move or predicted_type == actual_type
             _LLMObs.submit_evaluation(
                 span_context=span_context,
                 label=f"prediction_{i}_accuracy",
@@ -730,18 +734,27 @@ class AgentPredictor:
         self.agent_name = agent_name
         self.personality = personality
         self.game_type = game_type
-        self.mock_mode = os.getenv("MOCK_MODE", "true").lower() == "true"
+        self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
         self._bedrock_client = None
         self.neo4j_client = neo4j_client
         self.metrics = metrics
 
     def _get_bedrock_client(self):
         if self._bedrock_client is None:
-            import boto3
-            self._bedrock_client = boto3.client(
-                "bedrock-runtime",
-                region_name=os.getenv("AWS_REGION", "us-east-1"),
-            )
+            try:
+                import boto3
+                region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-west-2"))
+                self._bedrock_client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=region,
+                    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                    aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
+                )
+            except Exception as e:
+                logger.warning("Bedrock client init failed, falling back to mock: %s", e)
+                self.mock_mode = True
+                return None
         return self._bedrock_client
 
     async def predict_opponent(
@@ -885,7 +898,9 @@ class AgentPredictor:
     ) -> PredictionResult:
         """Call Amazon Bedrock Claude for opponent prediction, wrapped with LLM Obs."""
         client = self._get_bedrock_client()
-        model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-sonnet-4-5-20250929-v1:0")
+        if client is None:
+            return await self._predict_mock(game_state, opponent_history, my_history)
+        model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
         config = AGENT_PERSONALITIES.get(self.personality, AGENT_PERSONALITIES["adaptive"])
 
         intelligence_context = await self._fetch_intelligence_context(opponent_personality)
@@ -1002,7 +1017,14 @@ class AgentPredictor:
             return
 
         client = self._get_bedrock_client()
-        model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-sonnet-4-5-20250929-v1:0")
+        if client is None:
+            result = await self._predict_mock(game_state, opponent_history, my_history)
+            for i, pred in enumerate(result.predictions):
+                await asyncio.sleep(random.uniform(0.3, 0.8))
+                yield {"type": "prediction_branch", "index": i, "prediction": pred}
+            yield {"type": "prediction_complete", "result": result}
+            return
+        model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
         config = AGENT_PERSONALITIES.get(self.personality, AGENT_PERSONALITIES["adaptive"])
 
         prompt = self._build_prompt(game_state, my_history, opponent_history)
@@ -1070,6 +1092,13 @@ class AgentPredictor:
                             output_data=[{"role": "assistant", "content": full_text}],
                             metrics={"input_tokens": input_tokens, "output_tokens": output_tokens},
                         )
+                    except Exception:
+                        pass
+
+                # Export span for deferred evaluation (same as non-streaming path)
+                if _llmobs_enabled:
+                    try:
+                        result.llmobs_span = _LLMObs.export_span()
                     except Exception:
                         pass
 

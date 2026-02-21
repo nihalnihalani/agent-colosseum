@@ -14,6 +14,7 @@ export interface CommentatorState {
   keyMoments: Array<{ round: number; event: string; impact: string }>;
   currentInsight: string;
   matchProgress: { round: number; totalRounds: number; phase: string };
+  audience_votes?: { red: number; blue: number };
 }
 
 function MomentumBar({ leader, confidence }: { leader: string; confidence: number }) {

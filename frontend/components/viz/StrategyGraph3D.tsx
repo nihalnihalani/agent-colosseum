@@ -1,332 +1,364 @@
-"use client"
+'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from "react"
+import React, { useEffect, useRef, useState } from 'react';
 
-interface GraphNode {
+// ── Strategy colour palette (matches arena agent colours) ──────────────────
+const STRATEGY_COLORS: Record<string, string> = {
+  aggressive: '#ef4444',
+  defensive:  '#3b82f6',
+  adaptive:   '#a855f7',
+  chaotic:    '#f59e0b',
+  balanced:   '#10b981',
+  random:     '#ec4899',
+};
+
+function getStrategyColor(name: string): string {
+  const lower = (name ?? '').toLowerCase();
+  for (const [key, color] of Object.entries(STRATEGY_COLORS)) {
+    if (lower.includes(key)) return color;
+  }
+  // hash-based fallback for unknown personalities
+  const hue = Math.abs(
+    (name ?? '').split('').reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0)
+  ) % 360;
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
+// Log-scale so huge win-counts don't blow up the sphere radius
+function getNodeRadius(wins: number): number {
+  return Math.max(5, Math.min(18, 5 + Math.log1p(wins) * 3));
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────
+export interface GraphNode {
   id: string;
   name: string;
   val?: number;
   type?: string;
+  wins?: number;
+  losses?: number;
+  win_rate?: number;
+  total_matches?: number;
   x?: number;
   y?: number;
   z?: number;
 }
 
-interface GraphLink {
+export interface GraphLink {
   source: string | GraphNode;
   target: string | GraphNode;
   type?: string;
   wins?: number;
 }
 
-interface GraphData {
+export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
 }
 
 interface StrategyGraph3DProps {
   data: GraphData;
-  width?: number;
-  height?: number;
   onNodeClick?: (node: GraphNode) => void;
   onNodeHover?: (node: GraphNode | null) => void;
 }
 
+// ── Component ──────────────────────────────────────────────────────────────
 export function StrategyGraph3D({
   data,
-  width = 800,
-  height = 600,
   onNodeClick,
   onNodeHover,
 }: StrategyGraph3DProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const forceGraphRef = useRef<any>(null);
-  const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const graphRef      = useRef<any>(null);
+  const animFrameRef  = useRef<number>(0);
+  const lightAnimRef  = useRef<number>(0);
+  const rotationRef   = useRef<number>(0);
+  const initRef       = useRef(false);
 
+  const [isClient,     setIsClient]     = useState(false);
+  const [isLoading,    setIsLoading]    = useState(true);
+  const [hoveredNode,  setHoveredNode]  = useState<GraphNode | null>(null);
+
+  useEffect(() => { setIsClient(true); }, []);
+
+  // ── One-time 3D graph init ────────────────────────────────────────────────
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (!isClient || !containerRef.current || initRef.current) return;
+    let cancelled = false;
 
-  // Generate node color hue based on label
-  const getNodeHue = useCallback((label: string) => {
-    if (!label) return 200;
-    const hash = label.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    return Math.abs(hash) % 360;
-  }, []);
-
-  // Arena-themed relationship colors
-  const getRelationshipColor = useCallback((type: string) => {
-    const colors: Record<string, string> = {
-      'BEATS':     '#ff6b6b',
-      'LOSES_TO':  '#00CED1',
-      'FOR_ROUND': '#a855f7',
-      'HAS_ROUND': '#6b7280',
-      'default':   '#888888',
-    };
-    return colors[type] || colors['default'];
-  }, []);
-
-  useEffect(() => {
-    if (!isClient || !containerRef.current) return;
-
-    const loadForceGraph = async () => {
+    (async () => {
       try {
-        setIsLoading(true);
-
-        // Dynamic imports to avoid SSR issues
-        const ForceGraph3D = (await import('3d-force-graph')).default;
+        const { default: ForceGraph3D } = await import('3d-force-graph');
         const THREE = await import('three');
-        const SpriteText = (await import('three-spritetext')).default;
+        const { default: SpriteText }   = await import('three-spritetext');
 
-        if (!containerRef.current) return;
-
-        // Clear previous content
+        if (cancelled || !containerRef.current) return;
+        initRef.current = true;
         containerRef.current.innerHTML = '';
 
-        const Graph = new ForceGraph3D(containerRef.current)
-          .backgroundColor('rgba(15, 23, 42, 0.1)')
-          .width(width)
-          .height(height)
-          .nodeLabel('name')
-          .nodeAutoColorBy('type')
+        const w = containerRef.current.clientWidth  || 600;
+        const h = containerRef.current.clientHeight || 400;
+
+        const Graph = (ForceGraph3D as any)()(containerRef.current)
+          .backgroundColor('rgba(0,0,0,0)')
+          .showNavInfo(false)
+          .enableNodeDrag(false)
+          .width(w)
+          .height(h)
+          .nodeId('id')
+          .linkSource('source')
+          .linkTarget('target')
+
+          // ── Nodes ──────────────────────────────────────────────────────────
           .nodeThreeObject((node: any) => {
-            const geometry = new THREE.SphereGeometry(node.val || 5, 16, 16);
-            const material = new THREE.MeshLambertMaterial({
-              color: `hsl(${getNodeHue(node.name)}, 70%, 60%)`,
-              transparent: true,
-              opacity: 0.9,
-              emissive: `hsl(${getNodeHue(node.name)}, 70%, 30%)`,
-              emissiveIntensity: 0.3,
-            });
+            const wins   = node.wins   ?? 0;
+            const losses = node.losses ?? 0;
+            const radius = getNodeRadius(wins);
+            const hex    = getStrategyColor(node.name ?? '');
+            const color  = new THREE.Color(hex);
+            const group  = new THREE.Group();
 
-            const sphere = new THREE.Mesh(geometry, material);
+            // Core sphere – MeshLambertMaterial reacts to point lights
+            group.add(new THREE.Mesh(
+              new THREE.SphereGeometry(radius, 32, 32),
+              new THREE.MeshLambertMaterial({
+                color,
+                emissive:          color,
+                emissiveIntensity: 0.4,
+                transparent:       true,
+                opacity:           0.92,
+              })
+            ));
 
-            const textSprite = new SpriteText(node.name || 'Node');
-            textSprite.color = `hsl(${getNodeHue(node.name)}, 70%, 80%)`;
-            textSprite.textHeight = 4;
-            textSprite.position.set(0, 12, 0);
+            // Outer glow halo (back-face only so it wraps around)
+            group.add(new THREE.Mesh(
+              new THREE.SphereGeometry(radius * 1.45, 16, 16),
+              new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity:     0.07,
+                side:        THREE.BackSide,
+              })
+            ));
 
-            const group = new THREE.Group();
-            group.add(sphere);
-            group.add(textSprite);
+            // Name label (above)
+            const nameSprite = new SpriteText(node.name ?? '');
+            nameSprite.color           = '#ffffff';
+            nameSprite.fontWeight      = 'bold';
+            nameSprite.textHeight      = 3.2;
+            nameSprite.backgroundColor = 'rgba(0,0,0,0.65)';
+            nameSprite.padding         = 2.5;
+            nameSprite.borderRadius    = 4;
+            nameSprite.position.y      = radius + 3.5;
+            group.add(nameSprite);
+
+            // Win/Loss counter (below)
+            if (wins + losses > 0) {
+              const wr  = wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(0) : '?';
+              const sub = new SpriteText(`${wins}W · ${losses}L · ${wr}%`);
+              sub.color           = hex;
+              sub.fontWeight      = 'bold';
+              sub.textHeight      = 2.0;
+              sub.backgroundColor = 'rgba(0,0,0,0.55)';
+              sub.padding         = 2;
+              sub.borderRadius    = 3;
+              sub.position.y      = -(radius + 3.5);
+              group.add(sub);
+            }
 
             return group;
           })
-          .linkThreeObjectExtend(true)
-          .linkThreeObject((link: any) => {
-            const material = new THREE.LineBasicMaterial({
-              color: getRelationshipColor(link.type || 'default'),
-              transparent: true,
-              opacity: 0.8,
-              linewidth: 2,
-            });
 
-            const geometry = new THREE.BufferGeometry().setFromPoints([
-              new THREE.Vector3(0, 0, 0),
-              new THREE.Vector3(0, 0, 0),
-            ]);
+          // ── Links ──────────────────────────────────────────────────────────
+          .linkColor((l: any)    => l.type === 'BEATS' ? '#ff6b6b' : '#22d3ee')
+          .linkWidth(0.7)
+          .linkOpacity(0.25)
+          .linkCurvature(0.35)
+          .linkCurveRotation(Math.PI / 5)
+          // Only BEATS edges carry flowing particles (shows win direction)
+          .linkDirectionalParticles((l: any)      => l.type === 'BEATS' ? 22 : 8)
+          .linkDirectionalParticleSpeed(0.004)
+          .linkDirectionalParticleWidth((l: any)  => 2 + Math.log1p(l.wins ?? 1) * 0.6)
+          .linkDirectionalParticleColor((l: any)  => l.type === 'BEATS' ? '#ff6b6b' : '#22d3ee')
 
-            const line = new THREE.Line(geometry, material);
-
-            const linkLabel = new SpriteText(link.type || 'RELATED_TO');
-            linkLabel.color = getRelationshipColor(link.type || 'default');
-            linkLabel.textHeight = 2;
-            linkLabel.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-            linkLabel.padding = 2;
-
-            const group = new THREE.Group();
-            group.add(line);
-            group.add(linkLabel);
-
-            return group;
-          })
-          .linkPositionUpdate((linkObject: any, { start, end }: any) => {
-            const line = linkObject.children[0];
-            if (line && line.geometry) {
-              const positions = [start.x, start.y, start.z, end.x, end.y, end.z];
-              line.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            }
-
-            const label = linkObject.children[1];
-            if (label) {
-              const middlePos = {
-                x: start.x + (end.x - start.x) / 2,
-                y: start.y + (end.y - start.y) / 2,
-                z: start.z + (end.z - start.z) / 2,
-              };
-              Object.assign(label.position, middlePos);
-            }
-          })
           .onNodeClick((node: any) => {
-            const distance = 80;
-            const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
-
+            const dist = 80;
+            const mag  = Math.hypot(node.x ?? 1, node.y ?? 1, node.z ?? 1);
+            const r    = 1 + dist / Math.max(mag, 1);
             Graph.cameraPosition(
-              { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+              { x: (node.x ?? 0) * r, y: (node.y ?? 0) * r, z: (node.z ?? 0) * r },
               node,
-              3000
+              2000,
             );
-
-            if (onNodeClick) {
-              onNodeClick(node);
-            }
+            onNodeClick?.(node);
           })
           .onNodeHover((node: any) => {
-            if (containerRef.current) {
+            if (containerRef.current)
               containerRef.current.style.cursor = node ? 'pointer' : '';
-            }
-            if (onNodeHover) {
-              onNodeHover(node);
-            }
+            setHoveredNode(node ?? null);
+            onNodeHover?.(node ?? null);
           });
 
-        // Enhanced lighting
+        // Force layout spread
+        Graph.d3Force('charge')?.strength(-280);
+        Graph.d3Force('link')?.distance(130);
+        Graph.d3Force('center')?.strength(1.5);
+
+        // ── 3-point animated lighting rig ───────────────────────────────────
         const scene = Graph.scene();
+        if (scene) {
+          scene.children = scene.children.filter(
+            (c: any) => !(c instanceof THREE.Light)
+          );
+          scene.add(new THREE.AmbientLight(0x404040, 0.6));
 
-        scene.children = scene.children.filter((child: any) => !(child instanceof THREE.Light));
+          const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+          dir.position.set(100, 100, 100);
+          scene.add(dir);
 
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
-        scene.add(ambientLight);
+          const pRed  = new THREE.PointLight(0xff6b6b, 1.2, 450);
+          const pCyan = new THREE.PointLight(0x22d3ee, 0.8, 350);
+          const pPurp = new THREE.PointLight(0xa855f7, 0.5, 300);
+          pRed.position.set( 80,  60,  80);
+          pCyan.position.set(-80, -60, -80);
+          pPurp.position.set(  0, 120, -120);
+          scene.add(pRed, pCyan, pPurp);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(100, 100, 100);
-        directionalLight.castShadow = true;
-        scene.add(directionalLight);
-
-        const pointLight1 = new THREE.PointLight(0x00ced1, 1, 300);
-        pointLight1.position.set(50, 50, 50);
-        scene.add(pointLight1);
-
-        const pointLight2 = new THREE.PointLight(0xff6b6b, 0.8, 200);
-        pointLight2.position.set(-50, -50, -50);
-        scene.add(pointLight2);
-
-        const pointLight3 = new THREE.PointLight(0xa855f7, 0.6, 150);
-        pointLight3.position.set(0, 100, -100);
-        scene.add(pointLight3);
-
-        let animationId: number;
-        const animateLights = () => {
-          const time = Date.now() * 0.001;
-
-          pointLight1.intensity = 0.8 + Math.sin(time * 0.7) * 0.3;
-          pointLight2.intensity = 0.6 + Math.cos(time * 0.5) * 0.2;
-          pointLight3.intensity = 0.4 + Math.sin(time * 0.3) * 0.2;
-
-          pointLight1.position.x = Math.cos(time * 0.2) * 100;
-          pointLight1.position.z = Math.sin(time * 0.2) * 100;
-
-          pointLight2.position.x = Math.cos(time * 0.3 + Math.PI) * 80;
-          pointLight2.position.z = Math.sin(time * 0.3 + Math.PI) * 80;
-
-          animationId = requestAnimationFrame(animateLights);
-        };
-        animationId = requestAnimationFrame(animateLights);
-        (Graph as any).lightAnimationId = animationId;
-
-        Graph.d3Force('charge')?.strength(-300);
-        Graph.d3Force('link')?.distance(80);
-        Graph.cameraPosition({ x: 0, y: 0, z: 200 });
-
-        forceGraphRef.current = Graph;
-        Graph.graphData(data);
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading 3D force graph:', error);
-        setIsLoading(false);
-
-        if (containerRef.current) {
-          containerRef.current.innerHTML = `
-            <div style="
-              width: ${width}px;
-              height: ${height}px;
-              background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              color: white;
-              font-family: Arial, sans-serif;
-              border-radius: 8px;
-              border: 1px solid #444;
-            ">
-              <div style="text-align: center; padding: 20px;">
-                <h3 style="margin: 0 0 10px 0; color: #ff6b6b;">3D Graph Error</h3>
-                <p style="margin: 0 0 15px 0; color: #ccc;">Failed to load 3D visualization</p>
-                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-top: 15px;">
-                  <p style="margin: 0; font-size: 14px;">Nodes: ${data.nodes.length}</p>
-                  <p style="margin: 5px 0 0 0; font-size: 14px;">Links: ${data.links.length}</p>
-                </div>
-              </div>
-            </div>
-          `;
+          const animLights = () => {
+            if (cancelled) return;
+            const t = Date.now() * 0.001;
+            pRed.intensity  = 1.0 + Math.sin(t * 0.7) * 0.3;
+            pCyan.intensity = 0.6 + Math.cos(t * 0.5) * 0.2;
+            pPurp.intensity = 0.3 + Math.sin(t * 0.3) * 0.15;
+            pRed.position.x  = Math.cos(t * 0.22) * 110;
+            pRed.position.z  = Math.sin(t * 0.22) * 110;
+            pCyan.position.x = Math.cos(t * 0.30 + Math.PI) * 90;
+            pCyan.position.z = Math.sin(t * 0.30 + Math.PI) * 90;
+            lightAnimRef.current = requestAnimationFrame(animLights);
+          };
+          animLights();
         }
-      }
-    };
 
-    loadForceGraph();
+        // Camera: position + slow orbit for 3-D depth feeling
+        Graph.cameraPosition({ x: 0, y: 50, z: 220 });
+
+        let fitted = false;
+        Graph.onEngineStop(() => {
+          if (!fitted) { fitted = true; Graph.zoomToFit(900, 50); }
+        });
+
+        const orbit = () => {
+          if (cancelled) return;
+          rotationRef.current += 0.0007;
+          Graph.cameraPosition({
+            x: 190 * Math.sin(rotationRef.current),
+            y: 50,
+            z: 190 * Math.cos(rotationRef.current),
+          });
+          animFrameRef.current = requestAnimationFrame(orbit);
+        };
+        orbit();
+
+        graphRef.current = Graph;
+        Graph.graphData(data);
+        setIsLoading(false);
+
+      } catch (err) {
+        console.error('StrategyGraph3D error:', err);
+        setIsLoading(false);
+      }
+    })();
 
     return () => {
-      if (forceGraphRef.current && (forceGraphRef.current as any).lightAnimationId) {
-        cancelAnimationFrame((forceGraphRef.current as any).lightAnimationId);
-      }
+      cancelled = true;
+      cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(lightAnimRef.current);
+      graphRef.current?._destructor?.();
+      graphRef.current = null;
+      initRef.current  = false;
     };
-  }, [data, width, height, isClient, getNodeHue, getRelationshipColor, onNodeClick, onNodeHover]);
+  }, [isClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle window resize
+  // ── Update graph data when prop changes ──────────────────────────────────
   useEffect(() => {
-    const handleResize = () => {
-      if (forceGraphRef.current && containerRef.current) {
-        forceGraphRef.current
-          .width(containerRef.current.clientWidth)
-          .height(containerRef.current.clientHeight);
+    if (!graphRef.current) return;
+    graphRef.current.graphData(data);
+    // Refresh nodeThreeObject so colours/sizes update
+    graphRef.current.nodeThreeObject(graphRef.current.nodeThreeObject());
+  }, [data]);
+
+  // ── Resize observer ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver(entries => {
+      if (graphRef.current) {
+        const { width: w, height: h } = entries[0].contentRect;
+        graphRef.current.width(w).height(h);
       }
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
+    });
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
   }, []);
 
+  // ── SSR guard ─────────────────────────────────────────────────────────────
   if (!isClient) {
     return (
-      <div
-        style={{ width, height }}
-        className="flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-lg border border-slate-600"
-      >
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p>Initializing 3D Graph...</p>
-        </div>
+      <div className="w-full h-full flex items-center justify-center bg-black/30 text-zinc-500">
+        <div className="w-6 h-6 border-2 border-cyan-500/50 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-slate-600">
+    <div className="relative w-full h-full">
+
+      {/* Loading overlay */}
       {isLoading && (
-        <div
-          style={{ width, height }}
-          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white z-10"
-        >
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 rounded-xl">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p>Loading 3D Visualization...</p>
+            <div className="w-9 h-9 border-2 border-cyan-500/60 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-xs font-mono text-zinc-400 uppercase tracking-widest">
+              Building 3D graph…
+            </p>
           </div>
         </div>
       )}
-      <div
-        ref={containerRef}
-        style={{ width, height }}
-        className="bg-gradient-to-br from-slate-900 to-slate-800"
-      />
+
+      {/* Hover tooltip */}
+      {hoveredNode && (
+        <div className="absolute top-3 left-3 z-10 px-3 py-2 rounded-lg bg-black/80 border border-white/10 backdrop-blur-sm pointer-events-none">
+          <p className="text-xs font-bold text-white capitalize">{hoveredNode.name}</p>
+          <p
+            className="text-[10px] font-mono mt-0.5"
+            style={{ color: getStrategyColor(hoveredNode.name ?? '') }}
+          >
+            {hoveredNode.wins ?? 0}W ·&nbsp;{hoveredNode.losses ?? 0}L
+            {(hoveredNode.wins ?? 0) + (hoveredNode.losses ?? 0) > 0
+              ? ` · ${(
+                  ((hoveredNode.wins ?? 0) /
+                    ((hoveredNode.wins ?? 0) + (hoveredNode.losses ?? 0))) *
+                  100
+                ).toFixed(0)}% WR`
+              : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Legend */}
+      {!isLoading && (
+        <div className="absolute bottom-3 right-3 z-10 flex flex-col gap-1 pointer-events-none">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 border border-white/10">
+            <span className="w-3 h-[2px] rounded" style={{ background: '#ff6b6b' }} />
+            <span className="text-[9px] font-mono text-zinc-400">BEATS</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/60 border border-white/10">
+            <span className="w-3 h-[2px] rounded" style={{ background: '#22d3ee' }} />
+            <span className="text-[9px] font-mono text-zinc-400">LOSES_TO</span>
+          </div>
+        </div>
+      )}
+
+      <div ref={containerRef} className="w-full h-full" />
     </div>
   );
 }

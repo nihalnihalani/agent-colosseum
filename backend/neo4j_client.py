@@ -91,19 +91,23 @@ class Neo4jClient:
             logger.warning("Failed to store round in Neo4j: %s", e)
 
     async def get_counter_strategy(self, opponent_pattern: str) -> list[dict]:
-        """Find the best counter when opponent opens with a given move type."""
+        """Find the best counter-moves when opponent uses a given move type."""
         try:
             async with self._driver.session() as session:
                 result = await session.run(
                     """
-                    MATCH (m:Match)-[:HAS_ROUND]->(r:Round {number: 1})
-                    MATCH (r)-[:BLUE_MOVED]->(oppMove:Move {type: $pattern})
+                    MATCH (m:Match)-[:HAS_ROUND]->(r:Round)
+                    MATCH (r)-[:BLUE_MOVED]->(oppMove:Move)
                     MATCH (r)-[:RED_MOVED]->(myMove:Move)
+                    WHERE oppMove.type = $pattern
                     WITH myMove.type AS counter,
-                         count(*) AS times_used
-                    ORDER BY times_used DESC
+                         count(*) AS times_used,
+                         sum(CASE WHEN myMove.amount >= oppMove.amount THEN 1 ELSE 0 END) AS times_won
+                    WHERE times_used >= 1
+                    ORDER BY times_won DESC, times_used DESC
                     LIMIT 3
-                    RETURN counter, times_used
+                    RETURN counter, times_used, times_won,
+                           toFloat(times_won) / times_used AS win_rate
                     """,
                     pattern=opponent_pattern,
                 )
@@ -112,6 +116,63 @@ class Neo4jClient:
         except Exception as e:
             logger.warning("Neo4j counter strategy query failed: %s", e)
             return []
+
+    async def get_counter_strategies(self, agent_name: str, opponent_personality: str) -> list[str]:
+        """Return human-readable counter-strategy patterns for a given opponent personality.
+
+        Queries stored Strategy BEATS relationships and Move data to find
+        what works against the given opponent personality.
+        """
+        patterns: list[str] = []
+        try:
+            async with self._driver.session() as session:
+                # Query 1: Strategy BEATS relationships
+                result = await session.run(
+                    """
+                    MATCH (winner:Strategy)-[b:BEATS]->(loser:Strategy)
+                    WHERE loser.name CONTAINS $opp_personality
+                    RETURN winner.name AS winner_strategy,
+                           loser.name AS loser_strategy,
+                           winner.wins AS total_wins,
+                           count(b) AS encounters
+                    ORDER BY encounters DESC
+                    LIMIT 3
+                    """,
+                    opp_personality=opponent_personality,
+                )
+                records = await result.data()
+                for r in records:
+                    patterns.append(
+                        f"{r['winner_strategy']} beats {r['loser_strategy']} "
+                        f"in {r['encounters']} encounters"
+                    )
+
+                # Query 2: Most effective move types against this personality
+                result2 = await session.run(
+                    """
+                    MATCH (m:Match)-[:HAS_ROUND]->(r:Round)
+                    MATCH (r)-[:RED_MOVED]->(myMove:Move)
+                    MATCH (r)-[:BLUE_MOVED]->(oppMove:Move)
+                    MATCH (p:Prediction {agent: 'red'})-[:FOR_ROUND]->(r)
+                    WHERE p.was_correct = true
+                    WITH myMove.type AS my_move_type,
+                         oppMove.type AS opp_move_type,
+                         count(*) AS correct_predictions
+                    ORDER BY correct_predictions DESC
+                    LIMIT 3
+                    RETURN my_move_type, opp_move_type, correct_predictions
+                    """,
+                )
+                records2 = await result2.data()
+                for r in records2:
+                    patterns.append(
+                        f"When opponent plays {r['opp_move_type']}, "
+                        f"{r['my_move_type']} led to {r['correct_predictions']} correct predictions"
+                    )
+        except Exception as e:
+            logger.warning("Neo4j counter strategies query failed: %s", e)
+
+        return patterns
 
     async def get_bluff_detection(self, opponent_history: list[str]) -> list[dict]:
         """Detect the most common 3-move sequences in opponent play."""
@@ -233,6 +294,92 @@ class Neo4jClient:
         except Exception as e:
             logger.warning("Neo4j win matrix query failed: %s", e)
             return []
+
+    async def get_graph_data(self) -> dict:
+        """Return enriched graph nodes (Strategy) and edges (BEATS + LOSES_TO)
+        for the 3-D visualisation.
+
+        Node extras: wins, losses, win_rate, total_matches
+        Link extras: type (BEATS | LOSES_TO), wins count
+        """
+        try:
+            async with self._driver.session() as session:
+                # Nodes with win-rate calculation
+                node_result = await session.run(
+                    """
+                    MATCH (s:Strategy)
+                    WITH s,
+                         coalesce(s.wins,   0) AS w,
+                         coalesce(s.losses, 0) AS l
+                    RETURN s.name AS id,
+                           s.name AS name,
+                           w AS wins,
+                           l AS losses,
+                           CASE WHEN w + l > 0
+                                THEN toFloat(w) / (w + l)
+                                ELSE 0.5 END AS win_rate,
+                           w + l AS total_matches
+                    """
+                )
+                node_records = await node_result.data()
+
+                # BEATS edges aggregated by (winner, loser) pair
+                beats_result = await session.run(
+                    """
+                    MATCH (w:Strategy)-[b:BEATS]->(l:Strategy)
+                    RETURN w.name AS source,
+                           l.name AS target,
+                           count(b) AS wins
+                    """
+                )
+                beats_records = await beats_result.data()
+
+                # LOSES_TO edges (reverse of BEATS, lighter appearance in graph)
+                loses_result = await session.run(
+                    """
+                    MATCH (l:Strategy)-[r:LOSES_TO]->(w:Strategy)
+                    RETURN l.name AS source,
+                           w.name AS target,
+                           count(r) AS count
+                    """
+                )
+                loses_records = await loses_result.data()
+
+            nodes = []
+            for r in node_records:
+                wins   = int(r["wins"])
+                losses = int(r["losses"])
+                nodes.append({
+                    "id":            r["id"],
+                    "name":          r["name"],
+                    "val":           max(wins, 1) * 3,   # kept for API compat (frontend ignores)
+                    "type":          "Strategy",
+                    "wins":          wins,
+                    "losses":        losses,
+                    "win_rate":      float(r["win_rate"]),
+                    "total_matches": int(r["total_matches"]),
+                })
+
+            links = []
+            for r in beats_records:
+                links.append({
+                    "source": r["source"],
+                    "target": r["target"],
+                    "type":   "BEATS",
+                    "wins":   int(r["wins"]),
+                })
+            for r in loses_records:
+                links.append({
+                    "source": r["source"],
+                    "target": r["target"],
+                    "type":   "LOSES_TO",
+                    "wins":   int(r["count"]),
+                })
+
+            return {"nodes": nodes, "links": links}
+        except Exception as e:
+            logger.warning("Neo4j graph data query failed: %s", e)
+            return {"nodes": [], "links": []}
 
     # ------------------------------------------------------------------
     # Vector similarity search
@@ -527,6 +674,9 @@ class NoOpNeo4jClient:
     async def get_counter_strategy(self, opponent_pattern: str) -> list[dict]:
         return []
 
+    async def get_counter_strategies(self, agent_name: str, opponent_personality: str) -> list[str]:
+        return []
+
     async def get_bluff_detection(self, opponent_history: list[str]) -> list[dict]:
         return []
 
@@ -543,6 +693,9 @@ class NoOpNeo4jClient:
 
     async def get_win_matrix(self) -> list[dict]:
         return []
+
+    async def get_graph_data(self) -> dict:
+        return {"nodes": [], "links": []}
 
     async def find_similar_states(self, embedding: list[float], k: int = 5) -> list[dict]:
         return []

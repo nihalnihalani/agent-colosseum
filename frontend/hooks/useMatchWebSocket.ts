@@ -84,12 +84,21 @@ export function useMatchWebSocket(matchId: string | null) {
   const mockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const pendingConfigRef = useRef<MatchConfig | null>(null);
+  // Remember the last config so we can re-send start_match on reconnect
+  const lastConfigRef = useRef<MatchConfig | null>(null);
+  // Track whether match_start has been received (so we don't re-send start_match mid-match)
+  const matchStartedRef = useRef(false);
+  // Track whether the match ended normally (to avoid reconnect loop after match_end)
+  const matchCompletedRef = useRef(false);
   const isMock = process.env.NEXT_PUBLIC_MOCK_WS === 'true';
   const MAX_RECONNECT_ATTEMPTS = 5;
 
   const handleEvent = useCallback((event: WSEvent) => {
     switch (event.type) {
       case 'match_start':
+        matchStartedRef.current = true;
+        matchCompletedRef.current = false;
+        reconnectAttempts.current = 0; // reset only after a real match starts
         setMatchState((prev) => ({
           ...prev,
           matchId: event.matchId as string,
@@ -192,6 +201,9 @@ export function useMatchWebSocket(matchId: string | null) {
       }
 
       case 'match_end':
+        matchStartedRef.current = false; // allow re-start if user initiates a new match
+        matchCompletedRef.current = true; // match ended normally, don't reconnect
+        lastConfigRef.current = null;
         setMatchState((prev) => ({
           ...prev,
           winner: event.winner as string,
@@ -203,6 +215,10 @@ export function useMatchWebSocket(matchId: string | null) {
           totalFuturesSimulated: event.totalFuturesSimulated as number,
           phase: 'match_end' as MatchPhase,
         }));
+        break;
+
+      case 'ping':
+        // Server keepalive — ignore silently
         break;
     }
   }, []);
@@ -469,17 +485,36 @@ export function useMatchWebSocket(matchId: string | null) {
     const defaultWsHost = apiUrl.replace(/^http/, 'ws');
     const wsHost = process.env.NEXT_PUBLIC_WS_URL || defaultWsHost;
     const wsUrl = `${wsHost}/ws/match/${matchId}`;
+
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7286/ingest/0887ddae-d9a8-41ce-b2f9-2bcc03f09eb5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '916c9e' },
+        body: JSON.stringify({
+          sessionId: '916c9e',
+          location: 'agent-colosseum/frontend/hooks/useMatchWebSocket.ts:487',
+          message: 'Connecting to WebSocket',
+          data: { wsUrl },
+          timestamp: Date.now(),
+          hypothesisId: '1'
+        })
+      }).catch(() => {});
+    } catch (e) {}
+    // #endregion
+
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      // Ignore events from stale connections (React StrictMode double-invoke cleanup)
+      if (wsRef.current !== ws) return;
       setIsConnected(true);
       setError(null);
-      reconnectAttempts.current = 0;
-      // Drain any pending start_match that was queued before the connection opened
-      if (pendingConfigRef.current) {
-        const cfg = pendingConfigRef.current;
-        pendingConfigRef.current = null;  // null BEFORE send to avoid double-send on throw
+      // Determine which config to send: pending (queued while connecting) or last known
+      const cfg = pendingConfigRef.current ?? (!matchStartedRef.current ? lastConfigRef.current : null);
+      pendingConfigRef.current = null;
+      if (cfg) {
         ws.send(JSON.stringify({
           type: 'start_match',
           gameType: cfg.gameType,
@@ -491,6 +526,7 @@ export function useMatchWebSocket(matchId: string | null) {
     };
 
     ws.onmessage = (event) => {
+      if (wsRef.current !== ws) return;
       try {
         const data = JSON.parse(event.data) as WSEvent;
         handleEvent(data);
@@ -500,11 +536,39 @@ export function useMatchWebSocket(matchId: string | null) {
     };
 
     ws.onerror = () => {
+      if (wsRef.current !== ws) return;
+      // #region agent log
+      try {
+        fetch('http://127.0.0.1:7286/ingest/0887ddae-d9a8-41ce-b2f9-2bcc03f09eb5', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '916c9e' },
+          body: JSON.stringify({
+            sessionId: '916c9e',
+            location: 'agent-colosseum/frontend/hooks/useMatchWebSocket.ts:522',
+            message: 'WebSocket connection error',
+            data: { wsUrl },
+            timestamp: Date.now(),
+            hypothesisId: '1'
+          })
+        }).catch(() => {});
+      } catch (e) {}
+      // #endregion
       setError('WebSocket connection error');
     };
 
     ws.onclose = () => {
+      // Ignore close events from stale connections (cleanup or replacement).
+      // When React StrictMode cleans up, wsRef.current is set to null before
+      // onclose fires — without this guard that triggers a spurious reconnect loop.
+      if (wsRef.current !== ws) return;
       setIsConnected(false);
+      // Match ended normally — the server closes the WS after match_end.
+      // Don't reconnect or show an error in this case.
+      if (matchCompletedRef.current) {
+        return;
+      }
+      // Reset matchStarted so reconnect can re-send start_match (mid-match disconnect)
+      matchStartedRef.current = false;
       if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
         reconnectAttempts.current += 1;
@@ -519,18 +583,25 @@ export function useMatchWebSocket(matchId: string | null) {
     };
 
     return () => {
-      ws.close();
+      // Null the ref BEFORE closing so onclose/onerror/onopen handlers
+      // see wsRef.current !== ws and skip reconnect/state-update logic.
       wsRef.current = null;
+      ws.close();
     };
   }, [matchId, isMock, handleEvent, reconnectKey]);
 
   const startMatch = useCallback(
     (config: MatchConfig) => {
+      lastConfigRef.current = config; // remember for reconnects
       if (isMock) {
         setIsConnected(true);
         runMockMatch(config);
         return;
       }
+      // Guard: if match_start already received (match in progress via reconnect's ws.onopen),
+      // don't send a duplicate start_match that would corrupt the running match.
+      if (matchStartedRef.current) return;
+
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -542,11 +613,11 @@ export function useMatchWebSocket(matchId: string | null) {
           })
         );
       } else if (wsRef.current !== null) {
-        // Socket is CONNECTING or CLOSING — queue to drain on open
-        // Only the most-recent config is kept; earlier calls while CONNECTING are superseded.
+        // Socket is CONNECTING — queue to drain on open
         pendingConfigRef.current = config;
       } else {
-        console.warn('[useMatchWebSocket] startMatch called but no WebSocket exists yet');
+        // WS not yet created — lastConfigRef is set; ws.onopen will pick it up
+        pendingConfigRef.current = config;
       }
     },
     [isMock, runMockMatch]
