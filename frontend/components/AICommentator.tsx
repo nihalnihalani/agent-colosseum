@@ -11,18 +11,6 @@ interface AICommentatorProps {
   commentatorState: CommentatorState;
 }
 
-const defaultState: CommentatorState = {
-  strategyAnalysis: {
-    red: { style: 'unknown', currentTactic: 'analyzing...', riskLevel: 0 },
-    blue: { style: 'unknown', currentTactic: 'analyzing...', riskLevel: 0 },
-  },
-  momentum: { leader: 'none', confidence: 0, reason: 'Match starting...' },
-  predictionTrends: { red: [], blue: [] },
-  keyMoments: [],
-  currentInsight: 'Initializing arena commentary...',
-  matchProgress: { round: 0, totalRounds: 10, phase: 'lobby' },
-};
-
 export function AICommentator({ matchState, commentatorState }: AICommentatorProps) {
   // 1. Provide match state as readable context
   useCopilotReadable({
